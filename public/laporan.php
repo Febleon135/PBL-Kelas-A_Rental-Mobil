@@ -1,3 +1,12 @@
+<?php
+session_start();
+if (!isset($_SESSION['username']) || $_SESSION['role'] !== 'owner') {
+    header("Location: index.php");
+    exit;
+}
+include 'config.php';
+?>
+
 <!DOCTYPE html>
 <html :class="{ 'theme-dark': dark }" x-data="data()" lang="en">
   <head>

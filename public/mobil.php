@@ -1,165 +1,238 @@
+<?php
+session_start();
+include 'config.php';
+
+/** @var mysqli $conn */ 
+// PROTEKSI: Jika belum login, tendang ke login.php
+if (!isset($_SESSION['username'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// ─── LOGIKA PROSES BACKEND: TAMBAH MOBIL BARU ───
+if (isset($_POST['save_mobil'])) {
+    $id_mobil             = mysqli_real_escape_string($conn, $_POST['id_mobil']);
+    $id_kategori          = mysqli_real_escape_string($conn, $_POST['id_kategori']);
+    $merk                 = mysqli_real_escape_string($conn, $_POST['merk']);
+    $tipe                 = mysqli_real_escape_string($conn, $_POST['tipe']);
+    $nomor_polisi         = mysqli_real_escape_string($conn, $_POST['nomor_polisi']);
+    $tahun                = mysqli_real_escape_string($conn, $_POST['tahun']);
+    $pajak                = mysqli_real_escape_string($conn, $_POST['pajak']);
+    $warna                = mysqli_real_escape_string($conn, $_POST['warna']);
+    $harga_sewa_per_hari  = mysqli_real_escape_string($conn, $_POST['harga_sewa_per_hari']);
+    $kapasitas            = mysqli_real_escape_string($conn, $_POST['kapasitas']);
+    $status_mobil         = mysqli_real_escape_string($conn, $_POST['status_mobil']);
+
+    // Logika Upload Gambar (Saran Dosen: Simpan nama filenya saja di DB)
+    $nama_gambar = "default.png"; // Default jika tidak ada file di-upload
+    if (isset($_FILES['gambar']['name']) && $_FILES['gambar']['name'] != "") {
+        $ekstensi_diperbolehkan = array('png', 'jpg', 'jpeg');
+        $x = explode('.', $_FILES['gambar']['name']);
+        $ekstensi = strtolower(end($x));
+        $file_tmp = $_FILES['gambar']['tmp_name'];
+        
+        // Buat nama unik baru agar tidak bentrok (Contoh: MOBIL-Innova-12345.png)
+        $nama_gambar = "MOBIL-" . urlencode($merk) . "-" . time() . "." . $ekstensi;
+
+        if (in_array($ekstensi, $ekstensi_diperbolehkan) === true) {
+            // Pindahkan file fisik ke folder aset lokal yang kita buat kemarin
+            move_uploaded_file($file_tmp, 'assets/img/mobil/' . $nama_gambar);
+        }
+    }
+
+    // Query Insert ke Tabel Mobil
+    $query = "INSERT INTO mobil VALUES ('$id_mobil', '$id_kategori', '$merk', '$tipe', '$nomor_polisi', '$tahun', '$pajak', '$warna', '$harga_sewa_per_hari', '$kapasitas', '$status_mobil', '$nama_gambar')";
+
+    if (mysqli_query($conn, $query)) {
+        header("Location: mobil.php?status=success");
+        exit;
+    } else {
+        header("Location: mobil.php?status=failed");
+        exit;
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html :class="{ 'theme-dark': dark }" x-data="data()" lang="en">
   <head>
     <?php include 'components/head.php'; ?>
-    
     <style>
-      .figma-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        display: block !important;
-        clear: both !important;
-      }
-      .figma-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 24px !important;
-        width: 100% !important;
-        margin-bottom: 32px !important;
-      }
-      .figma-card {
-        background: #ffffff !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 16px !important;
-        padding: 24px !important;
-        width: calc(33.333% - 16px) !important; /* Mengunci mati 3 kolom ke samping */
-        min-width: 280px !important;
-        box-sizing: border-box !important;
-        position: relative !important;
-        display: flex !important;
-        flex-col: column !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-      }
-      .figma-img-box {
-        width: 160px !important;
-        height: 160px !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 16px !important;
-        padding: 12px !important;
-        margin-bottom: 16px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: transparent !important;
-        overflow: hidden !important;
-        box-sizing: border-box !important;
-      }
-      .figma-img {
-        max-width: 100% !important;
-        max-height: 100% !important;
-        object-fit: contain !important;
-        display: block !important;
-      }
-      /* Mengatasi bug tag bocor dari sidebar template */
-      .flex.flex-col.flex-1.w-full {
-        width: 100% !important;
-        min-w: 0 !important;
-        display: flex !important;
-      }
+      .figma-grid { display: flex !important; flex-wrap: wrap !important; gap: 24px !important; width: 100% !important; margin-bottom: 32px !important; }
+      .figma-card { background: #ffffff !important; border: 1px solid #e5e7eb !important; border-radius: 16px !important; padding: 24px !important; width: calc(33.333% - 16px) !important; min-width: 280px !important; box-sizing: border-box !important; position: relative !important; display: flex !important; flex-direction: column !important; align-items: center !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+      .figma-img-box { width: 140px !important; height: 140px !important; border: 1px solid #e5e7eb !important; border-radius: 16px !important; padding: 8px !important; margin-bottom: 16px !important; display: flex !important; align-items: center !important; justify-content: center !important; overflow: hidden !important; }
+      .figma-img { max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; }
     </style>
   </head>
   <body>
     <div class="flex h-screen bg-gray-50 dark:bg-gray-900" :class="{ 'overflow-hidden': isSideMenuOpen }">
       <?php include 'components/sidebar.php'; ?>
 
-      <div class="flex flex-col flex-1 w-full">
+      <div class="flex flex-col flex-1 w-full min-w-0">
         <?php include 'components/header.php'; ?>
 
         <main class="h-full overflow-y-auto">
-          <div class="container px-6 mx-auto figma-container">
+          <div class="container px-6 mx-auto grid">
             
             <h2 class="my-6 text-2xl font-semibold text-gray-700 dark:text-gray-200">
               Data Mobil
             </h2>
 
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 w-full">
-              <div class="relative w-full max-w-xs text-gray-500 focus-within:text-purple-600">
-                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                  </svg>
-                </div>
-                <input class="w-full pl-9 pr-4 py-1.5 text-sm text-gray-700 placeholder-gray-500 bg-white border border-gray-300 rounded-lg dark:placeholder-gray-500 dark:bg-gray-700 dark:text-gray-200 focus:border-purple-300 focus:outline-none focus:shadow-outline-purple form-input" type="text" placeholder="Cari Mobil" />
+            <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
+              <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold">
+                ✓ Aset mobil baru berhasil didaftarkan ke sistem!
+              </div>
+            <?php endif; ?>
+
+            <?php
+            // KONTROL ALUR TAMPILAN (FORM TAMBAH VS GRID VIEW)
+            if (isset($_GET['action']) && $_GET['action'] == 'add') {
+                
+                // OTO-GENERATE ID MOBIL (Contoh: MOB001, MOB002)
+                $q_id   = mysqli_query($conn, "SELECT id_mobil FROM mobil ORDER BY id_mobil DESC LIMIT 1");
+                $row_id = mysqli_fetch_assoc($q_id);
+                $form_id = $row_id ? "MOB" . sprintf("%03d", substr($row_id['id_mobil'], 3) + 1) : "MOB001";
+            ?>
+              <div class="mb-4">
+                <a href="mobil.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200">
+                  ← Kembali ke Galeri Armada
+                </a>
               </div>
 
-              <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 shadow-sm">
-                <svg class="w-3.5 h-3.5 mr-1.5 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.212 8H17"></path>
-                </svg>
-                Refresh
-              </button>
-            </div>
+              <div class="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800 mb-8">
+                <h4 class="mb-4 font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide border-b pb-2 dark:border-gray-700">
+                  TAMBAH DATA ARMADA MOBIL
+                </h4>
 
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
-              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">
-                DATA MOBIL
-              </h3>
-              
-              <div class="flex flex-wrap items-center gap-1 w-full sm:w-auto sm:justify-end">
-                <button class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
-                  <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                  Delete
-                </button>
-                <button class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
-                  <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
-                  Sort
-                </button>
-                <button class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
-                  <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                  Filters
-                </button>
-                <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 shadow-sm ml-2">
-                  <svg class="w-3.5 h-3.5 mr-1.5 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                  Edit
-                </button>
-                <button class="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-black rounded-lg hover:bg-gray-800 dark:bg-gray-100 dark:text-black shadow transition-colors duration-150 ml-1">
-                  <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                  Add
-                </button>
+                <form action="mobil.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input type="hidden" name="id_mobil" value="<?php echo $form_id; ?>">
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Kategori Kelas</span>
+                    <select name="id_kategori" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400">
+                      <?php 
+                        $kat = mysqli_query($conn, "SELECT * FROM kategori");
+                        while($k = mysqli_fetch_assoc($kat)) {
+                            echo "<option value='".$k['id_kategori']."'>".$k['jenis_kategori']."</option>";
+                        }
+                      ?>
+                    </select>
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Merk Mobil</span>
+                    <input type="text" name="merk" required placeholder="Contoh: Toyota, Mitsubishi" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Tipe Unit</span>
+                    <input type="text" name="tipe" required placeholder="Contoh: Innova Zenix, Pajero Sport" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Nomor Polisi (Plat)</span>
+                    <input type="text" name="nomor_polisi" required placeholder="Contoh: D 5289 PO" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Tahun Perakitan</span>
+                    <input type="number" name="tahun" required placeholder="Contoh: 2024" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Masa Berlaku Pajak</span>
+                    <input type="date" name="pajak" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Warna Kendaraan</span>
+                    <input type="text" name="warna" required placeholder="Contoh: Putih, Hitam Metalik" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Harga Sewa / Hari (Rp)</span>
+                    <input type="number" name="harga_sewa_per_hari" required placeholder="Contoh: 600000" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Kapasitas Penumpang</span>
+                    <input type="number" name="kapasitas" required placeholder="Contoh: 7" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                  </label>
+
+                  <label class="block text-sm">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Status Awal</span>
+                    <select name="status_mobil" class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400">
+                      <option value="tersedia">Tersedia</option>
+                      <option value="maintenance">Maintenance</option>
+                    </select>
+                  </label>
+
+                  <div class="block text-sm md:col-span-2">
+                    <span class="text-gray-700 dark:text-gray-400 font-medium">Foto Unit Kendaraan</span>
+                    <input type="file" name="gambar" accept="image/*" required class="block w-full mt-1 text-sm text-gray-500 dark:text-gray-400" />
+                  </div>
+
+                  <div class="flex items-center justify-end space-x-3 pt-4 border-t dark:border-gray-700 md:col-span-2">
+                    <a href="mobil.php" class="px-4 py-2 text-sm font-medium text-white bg-gray-500 rounded-lg hover:bg-gray-600">Cancel</a>
+                    <button type="submit" name="save_mobil" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
+                  </div>
+                </form>
               </div>
-            </div>
 
-            <div class="figma-grid">
-              
-              <?php
-              // Loop membuat 6 kartu mobil statis sesuai mockup halaman 4 kelompokmu
-              for ($i = 1; $i <= 6; $i++) {
-              ?>
-                <div class="figma-card">
-                  
-                  <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 focus:outline-none">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
-                    </svg>
-                  </button>
+            <?php
+            } else {
+            ?>
+              <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 mt-4 flex justify-between items-center w-full">
+                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">GALERI ARMADA</h3>
+                
+                <?php if ($_SESSION['role'] !== 'staff'): ?>
+                  <a href="mobil.php?action=add" class="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-black rounded-lg hover:bg-gray-800 shadow">
+                    + Add Mobil
+                  </a>
+                <?php endif; ?>
+              </div>
 
-                  <div class="figma-img-box">
-                    <img src="https://toyotamobile.id/wp-content/uploads/2023/01/4-Attitude-Black.webp" alt="Toyota Innova Zenix" class="figma-img" />
-                  </div>
+              <div class="figma-grid">
+                <?php
+                $cars = mysqli_query($conn, "SELECT * FROM mobil ORDER BY id_mobil ASC");
+                if (mysqli_num_rows($cars) > 0) {
+                    while ($c = mysqli_fetch_assoc($cars)) {
+                        // Logika deteksi badge status
+                        $badge_text  = "Tersedia";
+                        $badge_style = "text-green-600 bg-green-50 dark:text-green-400";
+                        if ($c['status_mobil'] == 'disewa') { $badge_text = "Disewa"; $badge_style = "text-blue-600 bg-blue-50"; }
+                        if ($c['status_mobil'] == 'maintenance') { $badge_text = "Maintenance"; $badge_style = "text-amber-600 bg-amber-50"; }
+                ?>
+                      <div class="figma-card">
+                        <div class="figma-img-box">
+                          <img src="assets/img/mobil/<?php echo $c['gambar']; ?>" alt="Mobil" class="figma-img" />
+                        </div>
 
-                  <div class="text-center w-full mt-1">
-                    <h4 class="font-bold text-gray-900 dark:text-gray-100 text-sm mb-1 tracking-tight">
-                      Toyota Innova Zenix - D 5289 PO
-                    </h4>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-3">
-                      Harga per hari : <span class="text-gray-700 dark:text-gray-300 font-semibold">Rp 600.000</span>
-                    </p>
-                  </div>
+                        <div class="text-center w-full mt-1">
+                          <h4 class="font-bold text-gray-900 dark:text-gray-100 text-sm mb-1 tracking-tight">
+                            <?php echo htmlspecialchars($c['merk'] . ' ' . $c['tipe'] . ' - ' . $c['nomor_polisi']); ?>
+                          </h4>
+                          <p class="text-[11px] text-gray-500 font-medium mb-3">
+                            Harga per hari : <span class="text-gray-700 dark:text-gray-300 font-semibold">Rp <?php echo number_format($c['harga_sewa_per_hari'], 0, ',', '.'); ?></span>
+                          </p>
+                        </div>
 
-                  <div class="w-full flex justify-center pt-2.5 border-t border-gray-100 dark:border-gray-700 mt-auto">
-                    <span class="inline-flex items-center text-[11px] font-bold text-green-600 dark:text-green-400">
-                      <span class="w-1.5 h-1.5 mr-1.5 bg-green-500 rounded-full"></span>Tersedia
-                    </span>
-                  </div>
-
-                </div>
-              <?php
-              }
-              ?>
-
-            </div>
+                        <div class="w-full flex justify-center pt-2.5 border-t border-gray-100 dark:border-gray-700 mt-auto">
+                          <span class="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded <?php echo $badge_style; ?>">
+                            <span class="w-1.5 h-1.5 mr-1.5 rounded-full" style="background-color: currentColor;"></span><?php echo $badge_text; ?>
+                          </span>
+                        </div>
+                      </div>
+                <?php
+                    }
+                } else {
+                    echo '<div class="w-full p-12 bg-white rounded-xl text-center text-gray-500 border border-gray-200">Belum ada unit mobil terdaftar di database. Silakan klik "+ Add Mobil".</div>';
+                }
+                ?>
+              </div>
+            <?php
+            }
+            ?>
 
           </div>
         </main>

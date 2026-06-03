@@ -1,232 +1,238 @@
+<?php
+session_start();
+include 'config.php';
+
+/** @var mysqli $conn */
+// PROTEKSI: Jika belum login, tendang ke login.php
+if (!isset($_SESSION['username'])) {
+  header("Location: login.php");
+  exit;
+}
+
+// ─── LOGIKA PROSES BACKEND: INPUT TRANSAKSI RENTAL BARU ───
+if (isset($_POST['save_transaksi'])) {
+  $id_transaksi    = mysqli_real_escape_string($conn, $_POST['id_transaksi']);
+  $id_pelanggan    = mysqli_real_escape_string($conn, $_POST['id_pelanggan']);
+  $id_mobil        = mysqli_real_escape_string($conn, $_POST['id_mobil']);
+  $id_pengguna     = $_SESSION['id_pengguna']; // Mengambil ID user yang sedang melayani di kasir
+  $tanggal_sewa    = mysqli_real_escape_string($conn, $_POST['tanggal_sewa']);
+  $durasi_sewa     = (int)$_POST['durasi_sewa'];
+  $diskon          = (float)$_POST['diskon'];
+
+  // 1. Hitung otomatis tanggal_kembali berdasarkan durasi hari
+  $tanggal_kembali = date('Y-m-d', strtotime($tanggal_sewa . ' + ' . $durasi_sewa . ' days'));
+
+  // 2. Ambil harga sewa per hari mobil tersebut untuk menghitung total biaya
+  $q_harga = mysqli_query($conn, "SELECT harga_sewa_per_hari FROM mobil WHERE id_mobil = '$id_mobil'");
+  $r_harga = mysqli_fetch_assoc($q_harga);
+  $harga_harian = $r_harga['harga_sewa_per_hari'];
+
+  // 3. Rumus Hitung Total Biaya: (Harga * Durasi) - Diskon
+  $total_biaya = ($harga_harian * $durasi_sewa) - $diskon;
+
+  // Mulai Database Transaction untuk menjaga validitas data ganda
+  mysqli_begin_transaction($conn);
+
+  // Query A: Insert ke tabel transaksi_rental
+  $query_insert = "INSERT INTO transaksi_rental VALUES ('$id_transaksi', '$id_pelanggan', '$id_mobil', '$id_pengguna', '$tanggal_sewa', '$tanggal_kembali', '$durasi_sewa', '$total_biaya', 'berjalan', '$diskon')";
+  $res_insert   = mysqli_query($conn, $query_insert);
+
+  // Query B: Otomatis ubah status mobil terkait menjadi 'disewa' agar tidak bisa dirental orang lain
+  $query_update_mobil = "UPDATE mobil SET status_mobil = 'disewa' WHERE id_mobil = '$id_mobil'";
+  $res_update_mobil   = mysqli_query($conn, $query_update_mobil);
+
+  if ($res_insert && $res_update_mobil) {
+    mysqli_commit($conn); // Sukses, simpan permanen ke DB
+    header("Location: penyewaan.php?status=success");
+    exit;
+  } else {
+    mysqli_rollback($conn); // Gagal, batalkan semua perubahan
+    header("Location: penyewaan.php?status=failed");
+    exit;
+  }
+}
+?>
+
 <!DOCTYPE html>
 <html :class="{ 'theme-dark': dark }" x-data="data()" lang="en">
-  <head>
-    <?php include 'components/head.php'; ?>
-  </head>
-  <body>
-    <div class="flex h-screen bg-gray-50 dark:bg-gray-900" :class="{ 'overflow-hidden': isSideMenuOpen }">
-      <?php include 'components/sidebar.php'; ?>
 
-      <div class="flex flex-col flex-1 w-full min-w-0">
-        <?php include 'components/header.php'; ?>
+<head>
+  <?php include 'components/head.php'; ?>
+</head>
 
-        <main class="h-full overflow-y-auto">
-          <div class="container px-6 mx-auto grid">
-            
-            <h2 class="my-6 text-2xl font-semibold text-gray-700 dark:text-gray-200">
-              Data Penyewaan
-            </h2>
+<body>
+  <div class="flex h-screen bg-gray-50 dark:bg-gray-900" :class="{ 'overflow-hidden': isSideMenuOpen }">
+    <?php include 'components/sidebar.php'; ?>
 
-            <?php
-            // Alur Deteksi: Tampilkan Form Tambah Transaksi Baru (Halaman 7 PDF) jika parameter URL aktif
-            if (isset($_GET['action']) && $_GET['action'] == 'add') {
-            ?>
-              <div class="mb-4">
-                <a href="penyewaan.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200 dark:text-purple-300 dark:bg-gray-700">
-                  ← Kembali ke Daftar Penyewaan
-                </a>
+    <div class="flex flex-col flex-1 w-full min-w-0">
+      <?php include 'components/header.php'; ?>
+
+      <main class="h-full overflow-y-auto">
+        <div class="container px-6 mx-auto grid">
+
+          <h2 class="my-6 text-2xl font-semibold text-gray-700 dark:text-gray-200">
+            Penyewaan Mobil
+          </h2>
+
+          <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
+            <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold">
+              ✓ Transaksi rental baru berhasil dicatat! Status mobil otomatis berubah menjadi 'Disewa'.
+            </div>
+          <?php endif; ?>
+
+          <?php
+          // KONTROL ALUR TAMPILAN (FORM TRANSAKSI VS LIST VIEW TRANSAKSI)
+          if (isset($_GET['action']) && $_GET['action'] == 'add') {
+
+            // OTO-GENERATE ID TRANSAKSI (Contoh: TR001, TR002)
+            $q_id   = mysqli_query($conn, "SELECT id_transaksi FROM transaksi_rental ORDER BY id_transaksi DESC LIMIT 1");
+            $row_id = mysqli_fetch_assoc($q_id);
+            $form_id = $row_id ? "TR" . sprintf("%03d", substr($row_id['id_transaksi'], 2) + 1) : "TR001";
+          ?>
+            <div class="mb-4">
+              <a href="penyewaan.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200">
+                ← Kembali ke Daftar Transaksi
+              </a>
+            </div>
+
+            <div class="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800 mb-8 max-w-2xl">
+              <h4 class="mb-4 font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide border-b pb-2 dark:border-gray-700">
+                INPUT TRANSAKSI RENTAL BARU
+              </h4>
+
+              <form action="penyewaan.php" method="POST" class="space-y-4">
+                <input type="hidden" name="id_transaksi" value="<?php echo $form_id; ?>">
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">ID Transaksi</span>
+                  <input type="text" value="<?php echo $form_id; ?>" readonly class="block w-full mt-1 text-sm bg-gray-100 dark:bg-gray-700 dark:text-gray-300 form-input" />
+                </label>
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Pilih Pelanggan</span>
+                  <select name="id_pelanggan" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400">
+                    <option value="">-- Pilih Pelanggan --</option>
+                    <?php
+                    $pel = mysqli_query($conn, "SELECT id_pelanggan, nama_pelanggan, NIK FROM pelanggan");
+                    while ($p = mysqli_fetch_assoc($pel)) {
+                      echo "<option value='" . $p['id_pelanggan'] . "'>" . $p['nama_pelanggan'] . " (" . $p['NIK'] . ")</option>";
+                    }
+                    ?>
+                  </select>
+                </label>
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Pilih Unit Mobil</span>
+                  <select name="id_mobil" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400">
+                    <option value="">-- Pilih Mobil Tersedia --</option>
+                    <?php
+                    $mob = mysqli_query($conn, "SELECT id_mobil, merk, tipe, nomor_polisi, harga_sewa_per_hari FROM mobil WHERE status_mobil = 'tersedia'");
+                    while ($m = mysqli_fetch_assoc($mob)) {
+                      echo "<option value='" . $m['id_mobil'] . "'>" . $m['merk'] . " " . $m['tipe'] . " [" . $m['nomor_polisi'] . "] - Rp " . number_format($m['harga_sewa_per_hari'], 0, ',', '.') . "/hari</option>";
+                    }
+                    ?>
+                  </select>
+                </label>
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Tanggal Mulai Sewa</span>
+                  <input type="date" name="tanggal_sewa" value="<?php echo date('Y-m-d'); ?>" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                </label>
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Durasi Sewa (Hari)</span>
+                  <input type="number" name="durasi_sewa" min="1" required placeholder="Contoh: 3" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                </label>
+
+                <label class="block text-sm">
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Potongan Diskon (Rp)</span>
+                  <input type="number" name="diskon" min="0" value="0" placeholder="Contoh: 50000" class="block w-full mt-1 text-sm dark:bg-gray-700 form-input focus:border-purple-400" />
+                </label>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t dark:border-gray-700">
+                  <a href="penyewaan.php" class="px-4 py-2 text-sm font-medium text-white bg-gray-500 rounded-lg hover:bg-gray-600">Cancel</a>
+                  <button type="submit" name="save_transaksi" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Simpan Sewa</button>
+                </div>
+              </form>
+            </div>
+
+          <?php
+          } else {
+          ?>
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 mt-4 flex justify-between items-center w-full">
+              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">LOG PENYEWAAAN BERJALAN</h3>
+              <a href="penyewaan.php?action=add" class="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-black rounded-lg hover:bg-gray-800 shadow">
+                + Tambah Transaksi Baru
+              </a>
+            </div>
+
+            <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-8">
+              <div class="w-full overflow-x-auto">
+                <table class="w-full whitespace-no-wrap">
+                  <thead>
+                    <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+                      <th class="px-4 py-3">ID Transaksi</th>
+                      <th class="px-4 py-3">Nama Pelanggan</th>
+                      <th class="px-4 py-3">Armada Mobil</th>
+                      <th class="px-4 py-3">Tgl Sewa</th>
+                      <th class="px-4 py-3">Tgl Kembali Seharusnya</th>
+                      <th class="px-4 py-3">Total Biaya</th>
+                      <th class="px-4 py-3">Status</th>
+                      <th class="px-4 py-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm">
+
+                    <?php
+                    $q_rental = mysqli_query($conn, "SELECT t.id_transaksi, p.nama_pelanggan, m.merk, m.tipe, m.nomor_polisi, t.tanggal_sewa, t.tanggal_kembali, t.total_biaya, t.status_sewa 
+                                                       FROM transaksi_rental t
+                                                       JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
+                                                       JOIN mobil m ON t.id_mobil = m.id_mobil
+                                                       ORDER BY t.id_transaksi DESC");
+
+                    if (mysqli_num_rows($q_rental) > 0) {
+                      while ($r = mysqli_fetch_assoc($q_rental)) {
+                        $badge = "bg-blue-600 text-white";
+                        if ($r['status_sewa'] == 'selesai') $badge = "bg-green-600 text-white";
+                        if ($r['status_sewa'] == 'terlambat') $badge = "bg-red-600 text-white";
+                    ?>
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                          <td class="px-4 py-3 font-semibold text-purple-600"><?php echo $r['id_transaksi']; ?></td>
+                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white"><?php echo htmlspecialchars($r['nama_pelanggan']); ?></td>
+                          <td class="px-4 py-3"><?php echo htmlspecialchars($r['merk'] . " " . $r['tipe'] . " [ " . $r['nomor_polisi'] . " ]"); ?></td>
+                          <td class="px-4 py-3"><?php echo date('d-m-Y', strtotime($r['tanggal_sewa'])); ?></td>
+                          <td class="px-4 py-3 font-medium text-amber-600"><?php echo date('d-m-Y', strtotime($r['tanggal_kembali'])); ?></td>
+                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Rp <?php echo number_format($r['total_biaya'], 0, ',', '.'); ?></td>
+                          <td class="px-4 py-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full <?php echo $badge; ?>">
+                              <?php echo ucfirst($r['status_sewa']); ?>
+                            </span>
+                          </td>
+                          <td class="px-4 py-3">
+                            <a href="detail_penyewaan.php?id=<?php echo $r['id_transaksi']; ?>" class="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors">
+                              Detail
+                            </a>
+                          </td>
+                        </tr>
+                    <?php
+                      }
+                    } else {
+                      echo '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">Belum ada transaksi rental berjalan.</td></tr>';
+                    }
+                    ?>
+
+                  </tbody>
+                </table>
               </div>
+            </div>
+          <?php
+          }
+          ?>
 
-              <div class="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800 mb-8">
-                <h4 class="mb-4 font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide border-b pb-2 dark:border-gray-700">
-                  Tambah Data Transaksi
-                </h4>
-
-                <div class="flex gap-4 mb-6">
-                  <button class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg">Pilih dari data yang sudah ada</button>
-                  <a href="pelanggan.php?action=add" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300">Masukkan data baru</a>
-                </div>
-
-                <form action="penyewaan.php" method="POST" class="space-y-4 max-w-2xl">
-                  <label class="block text-sm">
-                    <span class="text-gray-700 dark:text-gray-400 font-medium">Pilih Pelanggan</span>
-                    <select class="block w-full mt-1 text-sm dark:text-gray-300 dark:border-gray-600 dark:bg-gray-700 form-select focus:border-purple-400">
-                      <option>— Pilih Pelanggan —</option>
-                      <option>Agus Wijayanto</option>
-                      <option>Budi Kurnia</option>
-                      <option>Eka Pratama</option>
-                    </select>
-                  </label>
-
-                  <label class="block text-sm">
-                    <span class="text-gray-700 dark:text-gray-400 font-medium">Pilih Mobil</span>
-                    <select class="block w-full mt-1 text-sm dark:text-gray-300 dark:border-gray-600 dark:bg-gray-700 form-select focus:border-purple-400">
-                      <option>— Pilih Mobil —</option>
-                      <option>Avanza (B 1234 DF)</option>
-                      <option>Innova (D 4567 EF)</option>
-                      <option>Brio (F 8901 DC)</option>
-                    </select>
-                  </label>
-
-                  <label class="block text-sm">
-                    <span class="text-gray-700 dark:text-gray-400 font-medium">Tanggal Sewa</span>
-                    <input type="date" class="block w-full mt-1 text-sm dark:text-gray-300 dark:border-gray-600 dark:bg-gray-700 form-input focus:border-purple-400" />
-                  </label>
-
-                  <label class="block text-sm">
-                    <span class="text-gray-700 dark:text-gray-400 font-medium">Durasi Sewa (Hari)</span>
-                    <input type="number" placeholder="Masukkan Durasi Sewa (Hari)" class="block w-full mt-1 text-sm dark:text-gray-300 dark:border-gray-600 dark:bg-gray-700 form-input focus:border-purple-400" />
-                  </label>
-
-                  <label class="block text-sm">
-                    <span class="text-gray-700 dark:text-gray-400 font-medium">Status Awal Transaksi</span>
-                    <select class="block w-full mt-1 text-sm dark:text-gray-300 dark:border-gray-600 dark:bg-gray-700 form-select focus:border-purple-400">
-                      <option value="Berjalan">Berjalan</option>
-                    </select>
-                  </label>
-
-                  <div class="flex items-center justify-end space-x-3 pt-4 border-t dark:border-gray-700">
-                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                      Save
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-            <?php
-            } else {
-            ?>
-              <div class="grid gap-6 mb-8 md:grid-cols-2 xl:grid-cols-4">
-                <div class="flex items-center p-4 bg-white rounded-lg border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                  <div class="p-3 mr-4 text-purple-500 bg-purple-100 rounded-full dark:text-purple-100 dark:bg-purple-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                  </div>
-                  <div>
-                    <p class="text-2xl font-bold text-gray-700 dark:text-gray-200">12</p>
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transaksi Hari Ini</p>
-                  </div>
-                </div>
-                <div class="flex items-center p-4 bg-white rounded-lg border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                  <div class="p-3 mr-4 text-blue-500 bg-blue-100 rounded-full dark:text-blue-100 dark:bg-blue-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                  </div>
-                  <div>
-                    <p class="text-2xl font-bold text-gray-700 dark:text-gray-200">7</p>
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Mobil Sedang Berjalan</p>
-                  </div>
-                </div>
-                <div class="flex items-center p-4 bg-white rounded-lg border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                  <div class="p-3 mr-4 text-green-500 bg-green-100 rounded-full dark:text-green-100 dark:bg-green-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
-                  </div>
-                  <div>
-                    <p class="text-2xl font-bold text-gray-700 dark:text-gray-200">5</p>
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Transaksi Selesai</p>
-                  </div>
-                </div>
-                <div class="flex items-center p-4 bg-white rounded-lg border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                  <div class="p-3 mr-4 text-red-500 bg-red-100 rounded-full dark:text-red-100 dark:bg-red-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  </div>
-                  <div>
-                    <p class="text-2xl font-bold text-gray-700 dark:text-gray-200">2</p>
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Mobil Terlambat</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 w-full">
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                  
-                  <div class="md:col-span-7 flex flex-wrap items-center gap-2 w-full">
-                    <div class="relative w-full max-w-xs text-gray-500 focus-within:text-purple-600">
-                      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                      </div>
-                      <input class="w-full pl-9 pr-4 py-1.5 text-sm text-gray-700 placeholder-gray-500 bg-gray-50 border border-gray-300 rounded-lg dark:placeholder-gray-500 focus:outline-none" type="text" placeholder="Cari ID Transaksi / Nama" />
-                    </div>
-
-                    <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 shadow-sm">
-                      <svg class="w-3.5 h-3.5 mr-1.5 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.212 8H17"></path></svg>
-                      Refresh
-                    </button>
-                  </div>
-
-                  <div class="md:col-span-5 flex flex-wrap items-center justify-start md:justify-end gap-2 w-full">
-                    <button class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400">
-                      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                      Delete
-                    </button>
-                    <button class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400">
-                      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                      Filters
-                    </button>
-                    <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 shadow-sm ml-2">
-                      <svg class="w-3.5 h-3.5 mr-1.5 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                      Edit
-                    </button>
-                    <a href="penyewaan.php?action=add" class="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-black rounded-lg hover:bg-gray-800 dark:bg-gray-100 dark:text-black shadow transition-colors duration-150 ml-1">
-                      <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                      Add
-                    </a>
-                  </div>
-
-                </div>
-              </div>
-
-              <h3 class="text-base font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider mb-4">
-                Transaksi Terbaru
-              </h3>
-
-              <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-8">
-                <div class="w-full overflow-x-auto">
-                  <table class="w-full whitespace-no-wrap">
-                    <thead>
-                      <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
-                        <th class="px-4 py-3">ID Transaksi ↓</th>
-                        <th class="px-4 py-3">Pelanggan ↓</th>
-                        <th class="px-4 py-3">Mobil ↓</th>
-                        <th class="px-4 py-3">Tanggal Sewa ↓</th>
-                        <th class="px-4 py-3">Status ↓</th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm">
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                        <td class="px-4 py-3 font-semibold text-purple-600">TR001</td>
-                        <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Agus Wijayanto</td>
-                        <td class="px-4 py-3 font-semibold text-slate-700">Avanza B 1234 DF</td>
-                        <td class="px-4 py-3">19 MEI 2026</td>
-                        <td class="px-4 py-3">
-                          <span class="inline-flex items-center px-2.5 py-1 text-xs font-bold text-white bg-blue-600 rounded-full">
-                            <span class="w-1.5 h-1.5 mr-1.5 bg-white rounded-full"></span>Berjalan
-                          </span>
-                        </td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                        <td class="px-4 py-3 font-semibold text-purple-600">TR002</td>
-                        <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Budi Kurnia</td>
-                        <td class="px-4 py-3 font-semibold text-slate-700">Innova D 4567 EF</td>
-                        <td class="px-4 py-3">20 MEI 2026</td>
-                        <td class="px-4 py-3">
-                          <span class="inline-flex items-center px-2.5 py-1 text-xs font-bold text-white bg-green-600 rounded-full">
-                            <span class="w-1.5 h-1.5 mr-1.5 bg-white rounded-full"></span>Selesai
-                          </span>
-                        </td>
-                      </tr>
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                        <td class="px-4 py-3 font-semibold text-purple-600">TR003</td>
-                        <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Eka Pratama</td>
-                        <td class="px-4 py-3 font-semibold text-slate-700">Brio F 8901 DC</td>
-                        <td class="px-4 py-3">21 MEI 2026</td>
-                        <td class="px-4 py-3">
-                          <span class="inline-flex items-center px-2.5 py-1 text-xs font-bold text-red-700 bg-red-100 dark:bg-red-900 dark:text-red-100 rounded-full border border-red-300">
-                            <span class="w-1.5 h-1.5 mr-1.5 bg-red-600 rounded-full"></span>Terlambat
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            <?php
-            }
-            ?>
-
-          </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
-  </body>
+  </div>
+</body>
+
 </html>
