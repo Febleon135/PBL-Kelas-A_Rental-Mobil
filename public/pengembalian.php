@@ -15,76 +15,90 @@ define('TARIF_DENDA_PER_JAM', 50000);
 // ─── LOGIKA PROSES BACKEND: PROSES PENGEMBALIAN & HITUNG DENDA ───
 if (isset($_POST['proses_kembali'])) {
   $id_transaksi    = mysqli_real_escape_string($conn, $_POST['id_transaksi']);
-  $tanggal_kembali_aktual = mysqli_real_escape_string($conn, $_POST['tanggal_kembali_aktual']); // Format datetime-local
+  $tanggal_kembali_aktual = mysqli_real_escape_string($conn, $_POST['tanggal_kembali_aktual']);
   $kondisi_mobil   = mysqli_real_escape_string($conn, $_POST['kondisi_mobil']);
   $biaya_kerusakan = (float)$_POST['biaya_kerusakan'];
 
+  // Menangkap nilai input teks dari form denda kerusakan
+  $keterangan_kerusakan = isset($_POST['keterangan_kerusakan']) ? mysqli_real_escape_string($conn, $_POST['keterangan_kerusakan']) : '';
+
   // ─── PROSES UPLOAD BANYAK FOTO BUKTI KERUSAKAN ───
   $array_nama_foto = [];
-  
-  if (isset($_FILES['foto_bukti']['name']) && !empty(array_filter($_FILES['foto_bukti']['name']))) {
-      $total_files = count($_FILES['foto_bukti']['name']);
-      $ekstensi_ok = array('png', 'jpg', 'jpeg', 'webp');
 
-      for ($i = 0; $i < $total_files; $i++) {
-          $nama_file_asli = $_FILES['foto_bukti']['name'][$i];
-          $file_tmp       = $_FILES['foto_bukti']['tmp_name'][$i];
-          
-          $x = explode('.', $nama_file_asli);
-          $ekstensi = strtolower(end($x));
-          
-          if (in_array($ekstensi, $ekstensi_ok) === true) {
-              // Menyusun nama unik file foto
-              $nama_foto_unik = "BUKTI-" . $id_transaksi . "-" . ($i + 1) . "-" . time() . "." . $ekstensi;
-              
-              // Taruh di folder lokal project kalian
-              if (move_uploaded_file($file_tmp, 'assets/img/mobil/' . $nama_foto_unik)) {
-                  $array_nama_foto[] = $nama_foto_unik;
-              }
-          }
+  if (isset($_FILES['foto_bukti']['name']) && !empty(array_filter($_FILES['foto_bukti']['name']))) {
+    $total_files = count($_FILES['foto_bukti']['name']);
+    $ekstensi_ok = array('png', 'jpg', 'jpeg', 'webp');
+
+    for ($i = 0; $i < $total_files; $i++) {
+      $nama_file_asli = $_FILES['foto_bukti']['name'][$i];
+      $file_tmp       = $_FILES['foto_bukti']['tmp_name'][$i];
+
+      $x = explode('.', $nama_file_asli);
+      $ekstensi = strtolower(end($x));
+
+      if (in_array($ekstensi, $ekstensi_ok) === true) {
+        $nama_foto_unik = "BUKTI-" . $id_transaksi . "-" . ($i + 1) . "-" . time() . "." . $ekstensi;
+
+        // Masuk ke folder assets/img/bukti/ hasil alter folder
+        if (move_uploaded_file($file_tmp, 'assets/img/bukti/' . $nama_foto_unik)) {
+          $array_nama_foto[] = $nama_foto_unik;
+        }
       }
+    }
   }
 
-  // Gabungkan nama file gambar dengan tanda koma (Contoh: foto1.jpg,foto2.jpg)
+  // Gabungkan array nama foto jadi string panjang terpisah koma
   $string_foto_gabungan = implode(',', $array_nama_foto);
 
-  // 1. Tarik data transaksi untuk tahu id_mobil dan tanggal_kembali seharusnya
+  // 1. Tarik data transaksi awal
   $q_trans = mysqli_query($conn, "SELECT id_mobil, tanggal_kembali FROM transaksi_rental WHERE id_transaksi = '$id_transaksi'");
   $r_trans = mysqli_fetch_assoc($q_trans);
   $id_mobil = $r_trans['id_mobil'];
   $tgl_seharusnya = $r_trans['tanggal_kembali'];
 
-  // 2. HITUNG SELISIH JAM (Skala Jam Sesuai Figma)
+  // 2. Hitung denda keterlambatan jam
   $selisih_detik = strtotime($tanggal_kembali_aktual) - strtotime($tgl_seharusnya);
-  $jam_terlambat  = max(0, ceil($selisih_detik / 3600)); // Pembulatan ke atas jika lewat beberapa menit
-
-  // 3. Rumus Denda Waktu & Akumulasi Total
+  $jam_terlambat  = max(0, ceil($selisih_detik / 3600));
   $total_denda_waktu = $jam_terlambat * TARIF_DENDA_PER_JAM;
   $total_denda_keseluruhan = $total_denda_waktu + $biaya_kerusakan;
 
-  // Mulai Transaksi Database
   mysqli_begin_transaction($conn);
 
-  // Update status transaksi rental menjadi 'selesai'
   $u_transaksi = mysqli_query($conn, "UPDATE transaksi_rental SET status_sewa = 'selesai' WHERE id_transaksi = '$id_transaksi'");
 
-  // Kembalikan status mobil ke 'tersedia' atau 'maintenance' jika admin memilih rusak/lecet
   $status_mobil_baru = ($kondisi_mobil === 'rusak') ? 'maintenance' : 'tersedia';
   $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = '$status_mobil_baru' WHERE id_mobil = '$id_mobil'");
 
-  // Jika ada denda keterlambatan atau kerusakan fisik, simpan ke database
+  // SINKRONISASI KOLOM DEFINISI BARU HASIL ALTER TABLE
   $res_denda = true;
   if ($total_denda_keseluruhan > 0) {
     $q_id_d   = mysqli_query($conn, "SELECT id_denda FROM denda_kerusakan ORDER BY id_denda DESC LIMIT 1");
     $row_id_d = mysqli_fetch_assoc($q_id_d);
     $id_denda = $row_id_d ? "DND" . sprintf("%03d", substr($row_id_d['id_denda'], 3) + 1) : "DND001";
 
-    // PERBAIKAN: Menyimpan string_foto_gabungan ke dalam kolom terakhir denda_kerusakan
-    $ins_denda = "INSERT INTO denda_kerusakan VALUES ('$id_denda', '$id_transaksi', '$biaya_kerusakan', '$total_denda_waktu', '$total_denda_keseluruhan', '$string_foto_gabungan')";
+    // Query eksplisit aman, menaruh string foto pada posisi ke-6 sesuai fisik database
+    $ins_denda = "INSERT INTO denda_kerusakan 
+                  VALUES ('$id_denda', '$id_transaksi', '$biaya_kerusakan', '$total_denda_waktu', '$total_denda_keseluruhan', '$string_foto_gabungan', '$keterangan_kerusakan')";
     $res_denda = mysqli_query($conn, $ins_denda);
   }
 
-  if ($u_transaksi && $u_mobil && $res_denda) {
+  // ─── OTOMATISASI TIKET MAINTENANCE BENGKEL ───
+  $res_maint_ticket = true;
+  if ($kondisi_mobil === 'rusak') {
+    // Generate ID Maintenance baru secara otomatis (MNT001, MNT002, dst)
+    $q_id_m = mysqli_query($conn, "SELECT id_maintenance FROM maintenance ORDER BY id_maintenance DESC LIMIT 1");
+    $row_id_m = mysqli_fetch_assoc($q_id_m);
+    $id_maint_baru = $row_id_m ? "MNT" . sprintf("%03d", substr($row_id_m['id_maintenance'], 3) + 1) : "MNT001";
+    
+    $tgl_sekarang = date('Y-m-d');
+    
+    // Insert data antrean awal ke tabel maintenance dengan status 'proses'
+    $ins_maint = "INSERT INTO maintenance VALUES ('$id_maint_baru', '$id_mobil', '$tgl_sekarang', 0, 'proses', '$keterangan_kerusakan')";
+    $res_maint_ticket = mysqli_query($conn, $ins_maint);
+  }
+
+  // VALIDASI COMMIT: Pastikan semua query aman tanpa ada yang gagal
+  if ($u_transaksi && $u_mobil && $res_denda && $res_maint_ticket) {
     mysqli_commit($conn);
     header("Location: pengembalian.php?status=success");
     exit;
@@ -117,10 +131,9 @@ if (isset($_POST['proses_kembali'])) {
             Pengembalian Mobil
           </h2>
 
-          <!-- NOTIFIKASI STATUS -->
           <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
             <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold">
-              ✓ Mobil berhasil dikembalikan! Data keuangan denda dan status armada otomatis diperbarui.
+              ✓ Mobil berhasil dikembalikan! Data denda fisik & durasi serta status armada otomatis diperbarui.
             </div>
           <?php endif; ?>
 
@@ -138,7 +151,6 @@ if (isset($_POST['proses_kembali'])) {
                                            WHERE t.id_transaksi = '$id_t'");
             $dt = mysqli_fetch_assoc($q_data);
 
-            // Perhitungan live simulasi denda jam untuk Card 1 sebelum data di-save
             $waktu_sekarang = date('Y-m-d H:i:s');
             $selisih_detik  = strtotime($waktu_sekarang) - strtotime($dt['tanggal_kembali']);
             $jam_terlambat  = max(0, ceil($selisih_detik / 3600));
@@ -150,18 +162,13 @@ if (isset($_POST['proses_kembali'])) {
               </a>
             </div>
 
-            <!-- PERBAIKAN: Form Utama sekarang mendukung kiriman multipart file upload -->
             <form action="pengembalian.php" method="POST" enctype="multipart/form-data" class="space-y-6 mb-12">
               <input type="hidden" name="id_transaksi" value="<?php echo $dt['id_transaksi']; ?>">
 
-              <!-- CARD 1: DETAIL TRANSAKSI -->
               <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 uppercase tracking-wider border-b pb-2 dark:border-gray-700">Detail Transaksi</h3>
 
-                <!-- Container Flex dengan lebar kolom yang dipaksa rata -->
                 <div style="display: flex; flex-wrap: wrap; gap: 16px; width: 100%;" class="text-xs">
-
-                  <!-- Kolom 1 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">ID Transaksi</p>
@@ -173,7 +180,6 @@ if (isset($_POST['proses_kembali'])) {
                     </div>
                   </div>
 
-                  <!-- Kolom 2 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">Pelanggan</p>
@@ -185,7 +191,6 @@ if (isset($_POST['proses_kembali'])) {
                     </div>
                   </div>
 
-                  <!-- Kolom 3 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">Mobil</p>
@@ -198,7 +203,6 @@ if (isset($_POST['proses_kembali'])) {
                     </div>
                   </div>
 
-                  <!-- Kolom 4 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: flex-start; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">Tgl Sewa</p>
@@ -206,7 +210,6 @@ if (isset($_POST['proses_kembali'])) {
                     </div>
                   </div>
 
-                  <!-- Kolom 5 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">Tgl Kembali (Seharusnya)</p>
@@ -218,18 +221,15 @@ if (isset($_POST['proses_kembali'])) {
                     </div>
                   </div>
 
-                  <!-- Kolom 6 -->
                   <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: flex-start; min-height: 85px;">
                     <div>
                       <p class="text-gray-400 font-medium uppercase">Tgl Pengembalian Unit</p>
                       <p class="font-bold text-gray-800 dark:text-gray-200 mt-1"><?php echo date('d M Y H:i', strtotime($waktu_sekarang)); ?></p>
                     </div>
                   </div>
-
                 </div>
               </div>
 
-              <!-- CARD 2: FORM PENGECEKAN AKHIR -->
               <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 uppercase tracking-wider border-b pb-2 dark:border-gray-700">Form Pengecekan Akhir</h3>
 
@@ -283,20 +283,13 @@ if (isset($_POST['proses_kembali'])) {
                           accept="image/*"
                           multiple
                           class="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
-                        <p class="text-[11px] text-gray-400 mt-1.5 italic">💡 Kamu bisa menyorot atau memilih 2 sampai 4 foto lecet sekaligus sambil menekan tombol Ctrl/Shift di keyboard.</p>
+                        <p class="text-[11px] text-gray-400 mt-1.5 italic">💡 Kamu bisa memilih banyak foto sekaligus sambil menekan tombol Ctrl / Shift.</p>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <!-- PERBAIKAN: Tombol Save di Card 2 diubah type="submit" agar sinkron memicu aksi simpan ke database -->
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
-                  <a href="pengembalian.php" class="px-5 py-2 text-sm font-bold text-white bg-red-700 rounded-lg hover:bg-red-800 transition-colors">Cancel</a>
-                  <button type="submit" name="proses_kembali" class="px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Save</button>
-                </div>
               </div>
 
-              <!-- CARD 3: FORM DENDA KERUSAKAN -->
               <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 uppercase tracking-wider border-b pb-2 dark:border-gray-700">Form Denda Kerusakan</h3>
 
@@ -332,7 +325,7 @@ if (isset($_POST['proses_kembali'])) {
 
                 <div class="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
                   <a href="pengembalian.php" class="px-5 py-2 text-sm font-bold text-white bg-red-700 rounded-lg hover:bg-red-800 transition-colors">Cancel</a>
-                  <button type="submit" name="proses_kembali" class="px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Save</button>
+                  <button type="submit" name="proses_kembali" class="px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Save / Selesai</button>
                 </div>
               </div>
 
@@ -340,9 +333,6 @@ if (isset($_POST['proses_kembali'])) {
           <?php
           } else {
           ?>
-            <!-- ────────────────────────────────────────────────────────────── -->
-            <!-- INTERFACE 1: TABLE VIEW (DAFTAR ANTRIAN MOBIL DI JALAN)        -->
-            <!-- ────────────────────────────────────────────────────────────── -->
             <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 mt-4">
               <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Daftar Mobil Sedang Disewa (Belum Pulang)</h3>
             </div>
@@ -385,6 +375,72 @@ if (isset($_POST['proses_kembali'])) {
                       }
                     } else {
                       echo '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Semua mobil ada di dalam garasi. Belum ada unit yang sedang disewa keluar.</td></tr>';
+                    }
+                    ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-6 mt-8">
+              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Log Riwayat Pengembalian & Denda (Selesai)</h3>
+            </div>
+
+            <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-12">
+              <div class="w-full overflow-x-auto">
+                <table class="w-full whitespace-no-wrap">
+                  <thead>
+                    <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+                      <th class="px-4 py-3">ID Transaksi</th>
+                      <th class="px-4 py-3">Pelanggan</th>
+                      <th class="px-4 py-3">Mobil</th>
+                      <th class="px-4 py-3">Total Denda Ditagih</th>
+                      <th class="px-4 py-3">Aksi Petugas</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm">
+                    <?php
+                    $q_history = mysqli_query($conn, "SELECT t.id_transaksi, p.nama_pelanggan, m.merk, m.tipe, m.nomor_polisi, t.total_biaya 
+                                                      FROM transaksi_rental t
+                                                      JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
+                                                      JOIN mobil m ON t.id_mobil = m.id_mobil
+                                                      WHERE t.status_sewa = 'selesai' 
+                                                      ORDER BY t.id_transaksi DESC");
+
+                    if (mysqli_num_rows($q_history) > 0) {
+                      while ($h_row = mysqli_fetch_assoc($q_history)) {
+
+                        // Kita cek apakah transaksi ini memiliki denda secara dinamis ke tabel denda_kerusakan
+                        $id_t_cek = $h_row['id_transaksi'];
+                        $q_cek_biaya = mysqli_query($conn, "SELECT * FROM denda_kerusakan WHERE id_transaksi = '$id_t_cek'");
+                        $denda_exist = mysqli_fetch_assoc($q_cek_biaya);
+
+                        // Jika ada data denda, kita ambil kolom index ke-4 (total denda) secara dinamis tanpa peduli namanya apa
+                        if ($denda_exist) {
+                          $all_values = array_values($denda_exist);
+                          $nominal_denda = (float)$all_values[4]; // Membaca data total denda secara urutan struktur fisik
+                        } else {
+                          $nominal_denda = 0;
+                        }
+                    ?>
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                          <td class="px-4 py-3 font-semibold text-purple-600"><?php echo $h_row['id_transaksi']; ?></td>
+                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white"><?php echo htmlspecialchars($h_row['nama_pelanggan']); ?></td>
+                          <td class="px-4 py-3"><?php echo htmlspecialchars($h_row['merk'] . " " . $h_row['tipe'] . " [" . $h_row['nomor_polisi'] . "]"); ?></td>
+                          <td class="px-4 py-3 font-semibold <?php echo ($nominal_denda > 0) ? 'text-red-600' : 'text-green-600'; ?>">
+                            <?php echo ($nominal_denda > 0) ? 'Rp ' . number_format($nominal_denda, 0, ',', '.') : '✓ Bebas Denda'; ?>
+                          </td>
+                          <td class="px-4 py-3">
+                            <!-- Link tombol detail denda utama -->
+                            <a href="detail_pengembalian.php?id=<?php echo $h_row['id_transaksi']; ?>" class="inline-flex items-center px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors">
+                              Detail Denda
+                            </a>
+                          </td>
+                        </tr>
+                    <?php
+                      }
+                    } else {
+                      echo '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Belum ada riwayat mobil yang dikembalikan.</td></tr>';
                     }
                     ?>
                   </tbody>
