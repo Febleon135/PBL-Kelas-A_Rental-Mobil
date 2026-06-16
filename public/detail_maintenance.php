@@ -91,14 +91,28 @@ $data = mysqli_fetch_assoc($result);
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b pb-2 mb-4 dark:border-gray-700">Rincian Pengeluaran Finansial</h3>
 
                 <div class="space-y-4">
-                  <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
-                    <span class="text-gray-600 dark:text-gray-400">Tanggal Selesai Perbaikan</span>
-                    <span class="font-bold text-gray-800 dark:text-gray-200"><?php echo date('d F Y', strtotime($data['tgl_service'])); ?></span>
-                  </div>
-                  
+                  <!-- TAMPILAN STATUS DINAMIS -->
                   <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
                     <span class="text-gray-600 dark:text-gray-400">Status Karantina</span>
-                    <span class="px-2 py-0.5 font-bold text-green-700 bg-green-100 rounded uppercase text-[10px]">Selesai / Aktif</span>
+                    <?php if ($data['status_maintenance'] === 'selesai'): ?>
+                      <span class="px-2 py-0.5 font-bold text-green-700 bg-green-100 rounded uppercase text-[10px]">Selesai / Aktif</span>
+                    <?php else: ?>
+                      <span class="px-2 py-0.5 font-bold text-amber-700 bg-amber-100 rounded uppercase text-[10px]">Sedang Proses</span>
+                    <?php endif; ?>
+                  </div>
+
+                  <!-- TAMPILAN TANGGAL ESTIMASI AWAL -->
+                  <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
+                    <span class="text-gray-600 dark:text-gray-400">Estimasi Selesai (Awal)</span>
+                    <span class="font-bold text-amber-600 dark:text-amber-500">
+                      <?php echo empty($data['tgl_estimasi']) ? 'Belum Diatur' : date('d F Y', strtotime($data['tgl_estimasi'])); ?>
+                    </span>
+                  </div>
+
+                  <!-- TAMPILAN TANGGAL AKTUAL (TGL SERVICE TERAKHIR) -->
+                  <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
+                    <span class="text-gray-600 dark:text-gray-400">Tanggal Aktual (Pencatatan)</span>
+                    <span class="font-bold text-gray-800 dark:text-gray-200"><?php echo date('d F Y', strtotime($data['tgl_service'])); ?></span>
                   </div>
 
                   <div class="flex justify-between items-center pt-2 text-sm font-bold text-red-600">

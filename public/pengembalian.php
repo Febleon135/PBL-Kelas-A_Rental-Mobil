@@ -14,10 +14,11 @@ if (isset($_POST['proses_kembali'])) {
   $id_transaksi = mysqli_real_escape_string($conn, $_POST['id_transaksi']);
   $tanggal_kembali_aktual = mysqli_real_escape_string($conn, $_POST['tanggal_kembali_aktual']);
   $kondisi_mobil = mysqli_real_escape_string($conn, $_POST['kondisi_mobil']);
-  $kondisi_mesin = mysqli_real_escape_string($conn, $_POST['kondisi_mesin']);
   $kondisi_bensin = mysqli_real_escape_string($conn, $_POST['kondisi_bensin']);
   $km_mobil = intval($_POST['km_mobil']);
-  $biaya_kerusakan = (float)$_POST['biaya_kerusakan'];
+  
+  // Ambil input denda finansial
+  $biaya_kerusakan = isset($_POST['biaya_kerusakan']) ? (float)$_POST['biaya_kerusakan'] : 0;
   $keterangan_kerusakan = isset($_POST['keterangan_kerusakan']) ? mysqli_real_escape_string($conn, $_POST['keterangan_kerusakan']) : '';
 
   $array_nama_foto = [];
@@ -51,6 +52,13 @@ if (isset($_POST['proses_kembali'])) {
   $selisih_detik = strtotime($tanggal_kembali_aktual) - strtotime($tgl_seharusnya);
   $jam_terlambat = max(0, ceil($selisih_detik / 3600));
   $total_denda_waktu = $jam_terlambat * TARIF_DENDA_PER_JAM;
+  
+  // Jika mobil mulus, abaikan denda kerusakan fisik unit
+  if ($kondisi_mobil === 'baik') {
+    $biaya_kerusakan = 0;
+    $keterangan_kerusakan = 'Mobil kembali mulus tanpa cacat fisik.';
+  }
+  
   $total_denda_keseluruhan = $total_denda_waktu + $biaya_kerusakan;
 
   mysqli_begin_transaction($conn);
@@ -59,13 +67,14 @@ if (isset($_POST['proses_kembali'])) {
   $row_id_c = mysqli_fetch_assoc($q_id_c);
   $id_cek = $row_id_c ? "CEK" . sprintf("%03d", substr($row_id_c['id_cek'], 3) + 1) : "CEK001";
 
+  // Simpan log pengecekan (Kondisi body & mesin disatukan ke kolom kondisi_body)
   $ins_pengecekan = "INSERT INTO pengecekan (id_cek, id_transaksi, tgl_cek, kondisi_body, kondisi_mesin, indikator_bensin, km_mobil) 
-                     VALUES ('$id_cek', '$id_transaksi', '$tanggal_kembali_aktual', '$kondisi_mobil', '$kondisi_mesin', '$kondisi_bensin', '$km_mobil')";
+                     VALUES ('$id_cek', '$id_transaksi', '$tanggal_kembali_aktual', '$kondisi_mobil', '$kondisi_mobil', '$kondisi_bensin', '$km_mobil')";
   $u_pengecekan = mysqli_query($conn, $ins_pengecekan);
 
   $u_transaksi = mysqli_query($conn, "UPDATE transaksi_rental SET status_sewa = 'selesai' WHERE id_transaksi = '$id_transaksi'");
 
-  $status_mobil_baru = ($kondisi_mobil === 'rusak' || $kondisi_mesin === 'bermasalah') ? 'maintenance' : 'tersedia';
+  $status_mobil_baru = ($kondisi_mobil === 'rusak') ? 'maintenance' : 'tersedia';
   $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = '$status_mobil_baru' WHERE id_mobil = '$id_mobil'");
 
   $res_denda = true;
@@ -85,7 +94,9 @@ if (isset($_POST['proses_kembali'])) {
     $id_maint_baru = $row_id_m ? "MNT" . sprintf("%03d", substr($row_id_m['id_maintenance'], 3) + 1) : "MNT001";
 
     $tgl_sekarang = date('Y-m-d');
-    $ins_maint = "INSERT INTO maintenance VALUES ('$id_maint_baru', '$id_mobil', '$tgl_sekarang', 0, 'proses', '$keterangan_kerusakan')";
+    // FIX: Menggunakan definisi kolom spesifik dan mengisi NULL untuk tgl_estimasi
+    $ins_maint = "INSERT INTO maintenance (id_maintenance, id_mobil, tgl_service, tgl_estimasi, biaya_service, status_maintenance, keterangan) 
+                  VALUES ('$id_maint_baru', '$id_mobil', '$tgl_sekarang', NULL, 0, 'proses', '$keterangan_kerusakan')";
     $res_maint_ticket = mysqli_query($conn, $ins_maint);
   }
 
@@ -123,9 +134,7 @@ if ($total_pages < 1) $total_pages = 1;
 <head>
   <?php include 'components/head.php'; ?>
   <style>
-    [x-cloak] {
-      display: none !important;
-    }
+    [x-cloak] { display: none !important; }
   </style>
 </head>
 
@@ -137,15 +146,15 @@ if ($total_pages < 1) $total_pages = 1;
       <?php include 'components/header.php'; ?>
 
       <main class="h-full overflow-y-auto">
-        <div class="container px-6 mx-auto grid">
+        <div class="container px-6 mx-auto grid" x-data="{ kondisiMobil: 'baik', dendaType: 'none' }">
 
           <h2 class="my-6 text-2xl font-semibold text-gray-700 dark:text-gray-200">
             Pengembalian Mobil
           </h2>
 
           <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
-            <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold">
-              ✓ Mobil berhasil dikembalikan! Data denda fisik & durasi serta status armada otomatis diperbarui.
+            <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold shadow-sm">
+              ✓ Mobil berhasil dikembalikan! Status database armada otomatis disesuaikan secara real-time.
             </div>
           <?php endif; ?>
 
@@ -166,10 +175,9 @@ if ($total_pages < 1) $total_pages = 1;
 
             $selisih_detik = strtotime($waktu_sekarang) - strtotime($tgl_jatuh_tempo_aktual);
             $jam_terlambat = max(0, ceil($selisih_detik / 3600));
-            $denda_waktu_simulasi = $jam_terlambat * TARIF_DENDA_PER_JAM;
           ?>
             <div class="mb-6">
-              <a href="pengembalian.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200">
+              <a href="pengembalian.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200 shadow-sm transition-colors">
                 ← Kembali ke Daftar Antrean
               </a>
             </div>
@@ -242,24 +250,18 @@ if ($total_pages < 1) $total_pages = 1;
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div class="space-y-4">
-                    <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Tanggal & Jam Cek Masuk Pool</span>
-                      <input type="text" name="tanggal_kembali_aktual" value="<?php echo date('Y-m-d H:i:s'); ?>" required class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2" />
-                    </label>
+                    <input type="hidden" name="tanggal_kembali_aktual" id="hidden_waktu_kembali" value="<?php echo date('Y-m-d H:i:s'); ?>" />
+                    
+                    <div class="block text-sm p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg">
+                      <span class="text-gray-500 dark:text-gray-400 font-medium text-[10px] uppercase">Waktu Pencatatan Sistem (Real-Time):</span>
+                      <p id="live_clock" class="font-bold text-blue-600 dark:text-blue-400 mt-1 text-lg"><?php echo date('d M Y - H:i:s'); ?> WIB</p>
+                    </div>
 
                     <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Kondisi Fisik Body Mobil</span>
-                      <select name="kondisi_mobil" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-select focus:border-purple-400 rounded-lg border p-2">
-                        <option value="baik">Mulus / Baik</option>
-                        <option value="rusak">Lecet / Rusak</option>
-                      </select>
-                    </label>
-
-                    <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Kondisi Kelayakan Mesin</span>
-                      <select name="kondisi_mesin" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-select focus:border-purple-400 rounded-lg border p-2">
-                        <option value="baik">Baik / Normal</option>
-                        <option value="bermasalah">Bermasalah / Perlu Service</option>
+                      <span class="text-gray-700 dark:text-gray-400 font-medium">Kondisi Kelayakan Unit Mobil</span>
+                      <select name="kondisi_mobil" x-model="kondisiMobil" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-select focus:border-purple-400 rounded-lg border p-2">
+                        <option value="baik">Mulus / Baik (Bebas Denda Fisik)</option>
+                        <option value="rusak">Lecet / Rusak (Butuh Klaim Denda)</option>
                       </select>
                     </label>
 
@@ -280,68 +282,64 @@ if ($total_pages < 1) $total_pages = 1;
                         <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs font-semibold">KM</div>
                       </div>
                     </label>
-
-                    <div>
-                      <span class="text-gray-700 dark:text-gray-400 text-sm font-medium">Foto Bukti Fisik Kerusakan (Bisa Banyak Foto)</span>
-                      <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                        <input
-                          type="file"
-                          name="foto_bukti[]"
-                          accept="image/*"
-                          multiple
-                          class="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
-                        <p class="text-[11px] text-gray-400 mt-1.5 italic">💡 Kamu bisa memilih banyak foto sekaligus sambil menekan tombol Ctrl / Shift.</p>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
 
-              <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
+              <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800 transition-all duration-300" 
+                   x-show="kondisiMobil === 'rusak'" x-transition x-cloak>
+                
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 uppercase tracking-wider border-b pb-2 dark:border-gray-700">Form Denda Kerusakan</h3>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div class="space-y-4">
                     <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Jenis Kerusakan Fisik</span>
-                      <select name="jenis_kerusakan" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-select focus:border-purple-400 rounded-lg border p-2">
-                        <option value="none">Tidak Ada Kerusakan (Rp 0)</option>
-                        <option value="lecet">Lecet / Goresan Ringan</option>
-                        <option value="penyok">Penyok / Rusak Berat</option>
+                      <span class="text-gray-700 dark:text-gray-400 font-medium">Tingkat Kerusakan Fisik Unit</span>
+                      <select x-model="dendaType" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-select focus:border-purple-400 rounded-lg border p-2">
+                        <option value="none">-- Pilih Kategori Kerusakan --</option>
+                        <option value="ringan">Kerusakan Ringan (Lecet Halus / Goresan Kecil)</option>
+                        <option value="lumayan">Kerusakan Lumayan Parah (Penyok / Baret Dalam)</option>
+                        <option value="berat">Kerusakan Berat (Pecah Komponen / Ringsek)</option>
+                        <option value="lain">Lain-lain (Input Biaya Manual)</option>
                       </select>
                     </label>
 
                     <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Letak Kerusakan Komponen</span>
-                      <input type="text" name="letak_kerusakan" placeholder="Contoh: Pintu Kanan Belakang" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2" />
+                      <span class="text-gray-700 dark:text-gray-400 font-medium">Keterangan / Catatan Tambahan Kerusakan</span>
+                      <input type="text" name="keterangan_kerusakan" placeholder="Contoh: Lecet sepanjang 10cm di pintu kanan" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2" />
                     </label>
+
+                    <div>
+                      <span class="text-gray-700 dark:text-gray-400 text-sm font-medium">Foto Bukti Fisik Kerusakan (Bisa Banyak Foto)</span>
+                      <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <input type="file" name="foto_bukti[]" accept="image/*" multiple class="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                      </div>
+                    </div>
                   </div>
 
                   <div class="space-y-4">
                     <label class="block text-sm">
-                      <span class="text-gray-700 dark:text-gray-400 font-medium">Keterangan Catatan Tambahan</span>
-                      <input type="text" name="keterangan_kerusakan" placeholder="Contoh: Terdapat lecet sepanjang 10 cm" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2" />
-                    </label>
-
-                    <label class="block text-sm">
                       <span class="text-gray-700 dark:text-gray-400 font-medium">Biaya Ganti Rugi Kerusakan (Rp)</span>
-                      <input type="number" name="biaya_kerusakan" min="0" value="0" placeholder="Contoh: 500000" class="block w-full mt-1 text-sm dark:bg-gray-700 dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2" />
+                      <input type="number" name="biaya_kerusakan" id="biaya_kerusakan" min="0" value="0"
+                             :value="dendaType === 'ringan' ? 150000 : (dendaType === 'lumayan' ? 500000 : (dendaType === 'berat' ? 1500000 : 0))"
+                             :readonly="dendaType !== 'lain' && dendaType !== 'none'"
+                             class="block w-full mt-1 text-sm dark:text-gray-100 form-input focus:border-purple-400 rounded-lg border p-2 font-bold text-purple-600 bg-gray-50 dark:bg-gray-700" />
                     </label>
                   </div>
                 </div>
+              </div>
 
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t dark:border-gray-700">
-                  <a href="pengembalian.php" class="px-5 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Cancel</a>
-                  <button type="submit" name="proses_kembali" class="px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Save / Selesai</button>
-                </div>
+              <div class="flex justify-end space-x-3 mt-6">
+                <a href="pengembalian.php" class="px-5 py-2 text-sm font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors shadow-sm">Batal</a>
+                <button type="submit" name="proses_kembali" class="px-5 py-2.5 text-sm font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-md">Save / Selesai</button>
               </div>
 
             </form>
           <?php
           } else {
           ?>
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-4">
-              <h3 class="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Daftar Mobil Sedang Disewa (Belum Pulang)</h3>
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-4 mt-2">
+              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Daftar Mobil Sedang Disewa (Belum Pulang)</h3>
             </div>
 
             <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-8 bg-white dark:bg-gray-800">
@@ -484,6 +482,24 @@ if ($total_pages < 1) $total_pages = 1;
       </main>
     </div>
   </div>
+
+  <script>
+    if (document.getElementById('live_clock')) {
+      setInterval(function() {
+        const now = new Date();
+        
+        const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+        const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+        const dateStr = now.toLocaleDateString('id-ID', dateOptions).replace(/ /g, ' ');
+        document.getElementById('live_clock').innerText = dateStr + ' - ' + timeStr + ' WIB';
+
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        document.getElementById('hidden_waktu_kembali').value = `${y}-${m}-${d} ${timeStr}`;
+      }, 1000);
+    }
+  </script>
 </body>
 
 </html>
