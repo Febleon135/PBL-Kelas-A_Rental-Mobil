@@ -21,11 +21,19 @@
       class="flex-1 h-full max-w-4xl mx-auto overflow-hidden bg-white rounded-lg shadow-xl dark:bg-gray-800">
       <div class="flex flex-col overflow-y-auto md:flex-row">
         <div class="flex items-center justify-center p-6 md:h-auto md:w-1/2 bg-white dark:bg-gray-800">
+          
           <img
             aria-hidden="true"
-            class="object-contain w-4/5 max-w-xs h-auto"
+            class="object-contain w-4/5 max-w-xs h-auto block dark:hidden"
             src="assets/img/wheelsrent-logo.jpeg"
             alt="WheelsRent Logo" />
+            
+          <img
+            aria-hidden="true"
+            class="object-contain w-4/5 max-w-xs h-auto hidden dark:block"
+            src="assets/img/wheelsrent-logo-dark.png"
+            alt="WheelsRent Logo Dark" />
+
         </div>
         <div class="flex items-center justify-center p-6 sm:p-12 md:w-1/2">
           <div class="w-full">
@@ -34,14 +42,12 @@
               Login - WheelsRent
             </h1>
 
-            <!-- Notifikasi Jika Input Salah -->
             <?php if (isset($_GET['error']) && $_GET['error'] == 'gagal'): ?>
               <div style="color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; font-weight: 600;">
                 ❌ Username atau password salah!
               </div>
             <?php endif; ?>
 
-            <!-- FORM UTAMA PROSES MASUK -->
             <form action="proses_login.php" method="POST">
 
               <label class="block text-sm">
@@ -64,7 +70,6 @@
                   placeholder="***************" />
               </label>
 
-              <!-- Tombol Submit Form Nyata -->
               <button
                 type="submit"
                 name="login"

@@ -17,7 +17,6 @@ if (isset($_POST['proses_kembali'])) {
   $kondisi_bensin = mysqli_real_escape_string($conn, $_POST['kondisi_bensin']);
   $km_mobil = intval($_POST['km_mobil']);
   
-  // Ambil input denda finansial
   $biaya_kerusakan = isset($_POST['biaya_kerusakan']) ? (float)$_POST['biaya_kerusakan'] : 0;
   $keterangan_kerusakan = isset($_POST['keterangan_kerusakan']) ? mysqli_real_escape_string($conn, $_POST['keterangan_kerusakan']) : '';
 
@@ -46,14 +45,13 @@ if (isset($_POST['proses_kembali'])) {
   $r_trans = mysqli_fetch_assoc($q_trans);
   $id_mobil = $r_trans['id_mobil'];
 
-  $jam_kontrak_awal = date('H:i:s', strtotime($r_trans['tanggal_sewa']));
-  $tgl_seharusnya = $r_trans['tanggal_kembali'] . ' ' . $jam_kontrak_awal;
+  // LOGIKA BARU: Batas waktu pengembalian dipatok Pukul 14:00 WIB pada hari kepulangan
+  $tgl_seharusnya = date('Y-m-d', strtotime($r_trans['tanggal_kembali'])) . ' 14:00:00';
 
   $selisih_detik = strtotime($tanggal_kembali_aktual) - strtotime($tgl_seharusnya);
   $jam_terlambat = max(0, ceil($selisih_detik / 3600));
   $total_denda_waktu = $jam_terlambat * TARIF_DENDA_PER_JAM;
   
-  // Jika mobil mulus, abaikan denda kerusakan fisik unit
   if ($kondisi_mobil === 'baik') {
     $biaya_kerusakan = 0;
     $keterangan_kerusakan = 'Mobil kembali mulus tanpa cacat fisik.';
@@ -67,14 +65,13 @@ if (isset($_POST['proses_kembali'])) {
   $row_id_c = mysqli_fetch_assoc($q_id_c);
   $id_cek = $row_id_c ? "CEK" . sprintf("%03d", substr($row_id_c['id_cek'], 3) + 1) : "CEK001";
 
-  // Simpan log pengecekan (Kondisi body & mesin disatukan ke kolom kondisi_body)
   $ins_pengecekan = "INSERT INTO pengecekan (id_cek, id_transaksi, tgl_cek, kondisi_body, kondisi_mesin, indikator_bensin, km_mobil) 
                      VALUES ('$id_cek', '$id_transaksi', '$tanggal_kembali_aktual', '$kondisi_mobil', '$kondisi_mobil', '$kondisi_bensin', '$km_mobil')";
   $u_pengecekan = mysqli_query($conn, $ins_pengecekan);
 
-  $u_transaksi = mysqli_query($conn, "UPDATE transaksi_rental SET status_sewa = 'selesai' WHERE id_transaksi = '$id_transaksi'");
+  $u_transaksi = mysqli_query($conn, "UPDATE transaksi_rental SET status_sewa = 'Selesai' WHERE id_transaksi = '$id_transaksi'");
 
-  $status_mobil_baru = ($kondisi_mobil === 'rusak') ? 'maintenance' : 'tersedia';
+  $status_mobil_baru = ($kondisi_mobil === 'rusak') ? 'Maintenance' : 'Persiapan Unit';
   $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = '$status_mobil_baru' WHERE id_mobil = '$id_mobil'");
 
   $res_denda = true;
@@ -88,13 +85,12 @@ if (isset($_POST['proses_kembali'])) {
   }
 
   $res_maint_ticket = true;
-  if ($status_mobil_baru === 'maintenance') {
+  if ($status_mobil_baru === 'Maintenance') {
     $q_id_m = mysqli_query($conn, "SELECT id_maintenance FROM maintenance ORDER BY id_maintenance DESC LIMIT 1");
     $row_id_m = mysqli_fetch_assoc($q_id_m);
     $id_maint_baru = $row_id_m ? "MNT" . sprintf("%03d", substr($row_id_m['id_maintenance'], 3) + 1) : "MNT001";
 
     $tgl_sekarang = date('Y-m-d');
-    // FIX: Menggunakan definisi kolom spesifik dan mengisi NULL untuk tgl_estimasi
     $ins_maint = "INSERT INTO maintenance (id_maintenance, id_mobil, tgl_service, tgl_estimasi, biaya_service, status_maintenance, keterangan) 
                   VALUES ('$id_maint_baru', '$id_mobil', '$tgl_sekarang', NULL, 0, 'proses', '$keterangan_kerusakan')";
     $res_maint_ticket = mysqli_query($conn, $ins_maint);
@@ -102,6 +98,28 @@ if (isset($_POST['proses_kembali'])) {
 
   if ($u_pengecekan && $u_transaksi && $u_mobil && $res_denda && $res_maint_ticket) {
     mysqli_commit($conn);
+    
+    $q_sync = "UPDATE mobil m
+               SET status_mobil = (
+                   CASE
+                       WHEN m.status_mobil = 'Maintenance' THEN 'Maintenance'
+                       WHEN EXISTS (
+                           SELECT 1 FROM transaksi_rental t 
+                           WHERE t.id_mobil = m.id_mobil 
+                           AND t.status_sewa IN ('Booking', 'Disewakan') 
+                           AND CURDATE() BETWEEN DATE_SUB(t.tanggal_sewa, INTERVAL 7 DAY) AND t.tanggal_kembali
+                       ) THEN 'Disewa'
+                       WHEN EXISTS (
+                           SELECT 1 FROM transaksi_rental t 
+                           WHERE t.id_mobil = m.id_mobil 
+                           AND t.status_sewa = 'Selesai' 
+                           AND CURDATE() BETWEEN t.tanggal_kembali AND DATE_ADD(t.tanggal_kembali, INTERVAL 5 DAY)
+                       ) THEN 'Persiapan Unit'
+                       ELSE 'Tersedia'
+                   END
+               )";
+    mysqli_query($conn, $q_sync);
+
     header("Location: pengembalian.php?status=success");
     exit;
   } else {
@@ -122,7 +140,7 @@ if (!empty($search)) {
   $where_clause = "AND (t.id_transaksi LIKE '%$search%' OR p.nama_pelanggan LIKE '%$search%')";
 }
 
-$q_total = mysqli_query($conn, "SELECT COUNT(*) as total FROM transaksi_rental t JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan WHERE t.status_sewa = 'selesai' $where_clause");
+$q_total = mysqli_query($conn, "SELECT COUNT(*) as total FROM transaksi_rental t JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan WHERE t.status_sewa = 'Selesai' $where_clause");
 $r_total = mysqli_fetch_assoc($q_total);
 $total_data = $r_total['total'] ?? 0;
 $total_pages = ceil($total_data / $limit);
@@ -154,7 +172,7 @@ if ($total_pages < 1) $total_pages = 1;
 
           <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
             <div class="mb-4 p-3 bg-green-500 text-white rounded-lg text-sm font-semibold shadow-sm">
-              ✓ Mobil berhasil dikembalikan! Status database armada otomatis disesuaikan secara real-time.
+              ✓ Mobil berhasil dikembalikan! Auto-Sync Kalender bekerja, status armada otomatis diperbarui.
             </div>
           <?php endif; ?>
 
@@ -170,11 +188,13 @@ if ($total_pages < 1) $total_pages = 1;
             $dt = mysqli_fetch_assoc($q_data);
 
             $waktu_sekarang = date('Y-m-d H:i:s');
-            $jam_kontrak_simulasi = date('H:i:s', strtotime($dt['tanggal_sewa']));
-            $tgl_jatuh_tempo_aktual = $dt['tanggal_kembali'] . ' ' . $jam_kontrak_simulasi;
+            
+            // LOGIKA BARU: Batas waktu pengembalian dipatok Pukul 14:00 WIB pada hari kepulangan
+            $tgl_jatuh_tempo_aktual = date('Y-m-d', strtotime($dt['tanggal_kembali'])) . ' 14:00:00';
 
             $selisih_detik = strtotime($waktu_sekarang) - strtotime($tgl_jatuh_tempo_aktual);
             $jam_terlambat = max(0, ceil($selisih_detik / 3600));
+            $total_denda_waktu = $jam_terlambat * TARIF_DENDA_PER_JAM;
           ?>
             <div class="mb-6">
               <a href="pengembalian.php" class="inline-flex items-center px-3 py-2 text-sm font-medium text-purple-600 bg-purple-100 rounded-lg hover:bg-purple-200 shadow-sm transition-colors">
@@ -186,63 +206,66 @@ if ($total_pages < 1) $total_pages = 1;
               <input type="hidden" name="id_transaksi" value="<?php echo $dt['id_transaksi']; ?>">
 
               <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
-                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 uppercase tracking-wider border-b pb-2 dark:border-gray-700">Detail Transaksi</h3>
+                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-5 uppercase tracking-wider border-b pb-3 dark:border-gray-700">Detail Transaksi & Cek Keterlambatan</h3>
 
-                <div style="display: flex; flex-wrap: wrap; gap: 16px; width: 100%;" class="text-xs">
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">ID Transaksi</p>
-                      <p class="font-bold text-purple-600 dark:text-purple-400 font-mono mt-1"><?php echo $dt['id_transaksi']; ?></p>
-                    </div>
-                    <div class="w-full pt-2 border-t border-gray-100 dark:border-gray-700">
-                      <p class="text-gray-400 font-medium uppercase">Durasi Sewa</p>
-                      <p class="font-semibold text-gray-800 dark:text-gray-200 mt-1"><?php echo $dt['durasi_sewa']; ?> Hari</p>
-                    </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-xs">
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">ID Transaksi</p>
+                    <p class="font-bold text-purple-600 dark:text-purple-400 font-mono text-sm"><?php echo $dt['id_transaksi']; ?></p>
                   </div>
-
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">Pelanggan</p>
-                      <p class="font-bold text-gray-900 dark:text-white mt-1"><?php echo htmlspecialchars($dt['nama_pelanggan']); ?></p>
-                    </div>
-                    <div class="w-full pt-2 border-t border-gray-100 dark:border-gray-700">
-                      <p class="text-red-600 font-bold uppercase">Keterlambatan</p>
-                      <p class="font-bold text-red-600 mt-1"><?php echo $jam_terlambat; ?> Jam</p>
-                    </div>
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Pelanggan</p>
+                    <p class="font-bold text-gray-900 dark:text-white text-sm"><?php echo htmlspecialchars($dt['nama_pelanggan']); ?></p>
                   </div>
-
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">Mobil</p>
-                      <p class="font-bold text-gray-800 dark:text-gray-200 mt-1"><?php echo htmlspecialchars($dt['merk'] . ' ' . $dt['tipe']); ?> <span class="font-mono text-purple-500">(<?php echo htmlspecialchars($dt['nomor_polisi']); ?>)</span></p>
-                    </div>
-                    <div class="w-full pt-2 border-t border-gray-100 dark:border-gray-700">
-                      <p class="text-red-600 font-bold uppercase">Tarif Keterlambatan</p>
-                      <p class="font-bold text-red-600 mt-1">Rp <?php echo number_format(TARIF_DENDA_PER_JAM, 0, ',', '.'); ?>/Jam</p>
-                    </div>
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Mobil</p>
+                    <p class="font-bold text-gray-800 dark:text-gray-200 text-sm"><?php echo htmlspecialchars($dt['merk'] . ' ' . $dt['tipe']); ?></p>
                   </div>
-
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: flex-start; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">Tgl Sewa</p>
-                      <p class="font-semibold text-gray-700 dark:text-gray-300 mt-1"><?php echo date('d M Y H:i', strtotime($dt['tanggal_sewa'])); ?></p>
-                    </div>
-                  </div>
-
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: space-between; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">Tgl Kembali (Seharusnya)</p>
-                      <p class="font-bold text-amber-600 mt-1"><?php echo date('d M Y H:i', strtotime($tgl_jatuh_tempo_aktual)); ?></p>
-                    </div>
-                  </div>
-
-                  <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; justify-content: flex-start; min-height: 85px;">
-                    <div>
-                      <p class="text-gray-400 font-medium uppercase">Tgl Pengembalian Unit</p>
-                      <p class="font-bold text-green-600 dark:text-green-400 mt-1"><?php echo date('d M Y H:i', strtotime($waktu_sekarang)); ?></p>
-                    </div>
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Tarif Keterlambatan</p>
+                    <p class="font-bold text-gray-800 dark:text-gray-200 text-sm">Rp <?php echo number_format(TARIF_DENDA_PER_JAM, 0, ',', '.'); ?> <span class="text-gray-500 font-medium text-[10px]">/ Jam</span></p>
                   </div>
                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 py-5 border-y border-gray-100 dark:border-gray-700 text-xs">
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Tgl Sewa Berangkat</p>
+                    <p class="font-semibold text-gray-700 dark:text-gray-300 text-sm"><?php echo date('d M Y', strtotime($dt['tanggal_sewa'])); ?></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Batas Maksimal Kembali</p>
+                    <p class="font-bold text-amber-600 text-sm"><?php echo date('d M Y', strtotime($dt['tanggal_kembali'])); ?> <span class="bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded text-[10px] ml-1">14:00 WIB</span></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-400 font-medium uppercase mb-1">Waktu Aktual Kembali (Real-Time)</p>
+                    <p class="font-bold text-blue-600 text-sm"><?php echo date('d M Y - H:i', strtotime($waktu_sekarang)); ?> WIB</p>
+                  </div>
+                </div>
+
+                <?php if ($jam_terlambat > 0): ?>
+                  <div class="mt-5 p-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div>
+                      <h4 class="text-red-700 dark:text-red-400 font-bold uppercase text-xs tracking-wider">⚠️ Terlambat Pengembalian</h4>
+                      <p class="text-red-600 dark:text-red-300 text-sm mt-1.5 font-medium">Overtime: <span class="font-black text-xl px-2"><?php echo $jam_terlambat; ?> Jam</span></p>
+                    </div>
+                    <div class="text-right w-full sm:w-auto">
+                      <p class="text-red-700 dark:text-red-400 font-bold uppercase text-[10px] tracking-widest mb-1">Total Denda Waktu</p>
+                      <p class="text-red-600 dark:text-red-400 font-black text-2xl">Rp <?php echo number_format($total_denda_waktu, 0, ',', '.'); ?></p>
+                    </div>
+                  </div>
+                <?php else: ?>
+                  <div class="mt-5 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-center justify-between shadow-sm">
+                    <div>
+                      <h4 class="text-green-700 dark:text-green-400 font-bold uppercase text-xs tracking-wider">✅ Tepat Waktu</h4>
+                      <p class="text-green-600 dark:text-green-300 text-sm mt-1 font-medium">Unit dikembalikan sebelum batas waktu (Bebas Denda Waktu).</p>
+                    </div>
+                    <div class="text-right hidden sm:block">
+                      <p class="text-green-700 dark:text-green-400 font-bold uppercase text-[10px] tracking-widest mb-1">Total Denda Waktu</p>
+                      <p class="text-green-600 dark:text-green-400 font-black text-xl">Rp 0</p>
+                    </div>
+                  </div>
+                <?php endif; ?>
+
               </div>
 
               <div class="p-6 bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800">
@@ -339,7 +362,7 @@ if ($total_pages < 1) $total_pages = 1;
           } else {
           ?>
             <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 mb-4 mt-2">
-              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Daftar Mobil Sedang Disewa (Belum Pulang)</h3>
+              <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-2 uppercase tracking-wider">Daftar Mobil Sedang Disewa (Belum Pulang)</h3>
             </div>
 
             <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-8 bg-white dark:bg-gray-800">
@@ -360,7 +383,7 @@ if ($total_pages < 1) $total_pages = 1;
                                                    FROM transaksi_rental t
                                                    JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
                                                    JOIN mobil m ON t.id_mobil = m.id_mobil
-                                                   WHERE t.status_sewa = 'berjalan' ORDER BY t.tanggal_kembali ASC");
+                                                   WHERE t.status_sewa = 'Disewakan' ORDER BY t.tanggal_kembali ASC");
 
                     if (mysqli_num_rows($q_load) > 0) {
                       while ($row = mysqli_fetch_assoc($q_load)) {
@@ -419,7 +442,7 @@ if ($total_pages < 1) $total_pages = 1;
                                                       FROM transaksi_rental t
                                                       JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
                                                       JOIN mobil m ON t.id_mobil = m.id_mobil
-                                                      WHERE t.status_sewa = 'selesai' $where_clause
+                                                      WHERE t.status_sewa = 'Selesai' $where_clause
                                                       ORDER BY t.id_transaksi DESC 
                                                       LIMIT $start, $limit");
 
@@ -487,7 +510,6 @@ if ($total_pages < 1) $total_pages = 1;
     if (document.getElementById('live_clock')) {
       setInterval(function() {
         const now = new Date();
-        
         const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
         const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
         const dateStr = now.toLocaleDateString('id-ID', dateOptions).replace(/ /g, ' ');

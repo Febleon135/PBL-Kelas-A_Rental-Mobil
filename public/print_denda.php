@@ -33,6 +33,9 @@ if ($denda_data) {
     $total_akumulasi = 0;
     $catatan_lap     = 'Unit dikembalikan tepat waktu tanpa kerusakan.';
 }
+
+// FIX: Hilangkan jam 00:00 dan set jatuh tempo jadi +1 hari (24 Jam) dari tanggal kembali
+$tgl_jatuh_tempo = date('d-m-Y', strtotime($data['tanggal_kembali'] . ' +1 day'));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -92,7 +95,10 @@ if ($denda_data) {
 
     <div class="border-dashed"></div>
 
-    <div class="flex-box"><span>Kontrak Jatuh Tempo :</span><span><?= date('d-m-Y H:i', strtotime($data['tanggal_kembali'] . ' ' . date('H:i', strtotime($data['tanggal_sewa'])))); ?> WIB</span></div>
+    <div class="flex-box">
+        <span>Kontrak Jatuh Tempo :</span>
+        <span><?= $tgl_jatuh_tempo; ?></span>
+    </div>
     <div class="border-dashed"></div>
 
     <p class="bold" style="margin: 6px 0 2px 0;">REKAP PENGECEKAN PETUGAS KASIR:</p>

@@ -27,8 +27,8 @@ if (isset($_POST['tambah_manual_maintenance'])) {
   $ins_maint = mysqli_query($conn, "INSERT INTO maintenance (id_maintenance, id_mobil, tgl_service, tgl_estimasi, biaya_service, status_maintenance, keterangan) 
                                     VALUES ('$id_maint_baru', '$id_mobil_manual', '$tgl_masuk', '$tgl_estimasi', 0, 'proses', 'Service Manual: $keterangan_awal')");
 
-  // Ubah status mobil di pool menjadi 'maintenance'
-  $upd_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'maintenance' WHERE id_mobil = '$id_mobil_manual'");
+  // Ubah status mobil di pool menjadi 'Maintenance' (Sesuai ENUM baru)
+  $upd_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'Maintenance' WHERE id_mobil = '$id_mobil_manual'");
 
   if ($ins_maint && $upd_mobil) {
     mysqli_commit($conn);
@@ -66,8 +66,8 @@ if (isset($_POST['proses_selesai_maintenance'])) {
 
   mysqli_begin_transaction($conn);
 
-  // 1. Kembalikan status armada mobil menjadi tersedia
-  $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'tersedia' WHERE id_mobil = '$id_mobil_fix'");
+  // 1. Kembalikan status armada mobil menjadi Tersedia (Sesuai ENUM baru)
+  $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'Tersedia' WHERE id_mobil = '$id_mobil_fix'");
 
   // 2. Perbarui data di tabel maintenance: isi biaya, tanggal fix, keterangan akhir, dan ubah ke 'selesai'
   $u_maint = mysqli_query($conn, "UPDATE maintenance 
@@ -199,7 +199,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                             <div x-show="!isEditing" class="flex flex-col gap-2 min-w-[200px]">
                               <p class="text-xs text-gray-500 italic border-l-2 border-purple-400 pl-2 leading-tight">"<?php echo htmlspecialchars($row['keterangan']); ?>"</p>
                               <div class="flex items-center gap-2 mt-1">
-                                <button type="button" @click="isEditing = true" class="px-3 py-1 text-[10px] font-bold text-blue-600 border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition-colors">Ubah Est / Log</button>
+                                <button type="button" @click.prevent.stop="isEditing = true" class="px-3 py-1 text-[10px] font-bold text-blue-600 border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition-colors">Ubah Est / Log</button>
                                 
                                 <form action="maintenance.php" method="POST" class="flex m-0 gap-1" onsubmit="return confirm('Apakah unit ini benar-benar selesai diperbaiki dan nota biaya sudah final?')">
                                   <input type="hidden" name="id_mobil" value="<?php echo $row['id_mobil']; ?>">
@@ -221,7 +221,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                                 </div>
                                 <input type="text" name="keterangan_edit" value="<?php echo htmlspecialchars($row['keterangan']); ?>" required placeholder="Log montir terbaru..." class="p-1.5 border rounded w-full focus:border-blue-400 dark:bg-gray-600 dark:border-gray-500">
                                 <div class="flex gap-2 justify-end mt-1">
-                                  <button type="button" @click="isEditing = false" class="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Batal</button>
+                                  <button type="button" @click.prevent.stop="isEditing = false" class="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Batal</button>
                                   <button type="submit" name="update_proses_maintenance" class="px-3 py-1 text-[10px] font-bold text-white bg-blue-600 rounded hover:bg-blue-700">Simpan Perubahan</button>
                                 </div>
                               </form>
@@ -270,12 +270,14 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
     </div>
   </div>
 
-  <div x-show="isAddOpen" x-cloak style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.5) !important; backdrop-filter: blur(4px) !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 16px !important;">
-    <div @click.away="isAddOpen = false" class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700" style="position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;">
+  <div x-show="isAddOpen" x-cloak x-transition
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    
+    <div @click.away="isAddOpen = false" class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 cursor-default" role="dialog">
       
       <header class="flex justify-between items-center border-b pb-3 mb-5 dark:border-gray-700">
         <h3 class="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider text-sm">Masukan Unit ke Bengkel (Manual)</h3>
-        <button type="button" @click="isAddOpen = false" class="text-gray-400 hover:text-red-500 font-black text-lg transition-colors">✕</button>
+        <button type="button" @click.stop="isAddOpen = false" class="text-gray-400 hover:text-red-500 font-black text-lg transition-colors">✕</button>
       </header>
 
       <form action="maintenance.php" method="POST" class="space-y-4">
@@ -285,7 +287,8 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
           <select name="id_mobil_manual" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400 rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-200 p-2.5">
             <option value="">-- Pilih Mobil --</option>
             <?php
-            $mob_ready = mysqli_query($conn, "SELECT id_mobil, merk, tipe, nomor_polisi FROM mobil WHERE status_mobil = 'tersedia'");
+            // FIX: Query sesuai ENUM (Huruf T besar)
+            $mob_ready = mysqli_query($conn, "SELECT id_mobil, merk, tipe, nomor_polisi FROM mobil WHERE status_mobil = 'Tersedia'");
             while ($m = mysqli_fetch_assoc($mob_ready)) {
               echo "<option value='" . $m['id_mobil'] . "'>" . $m['merk'] . " " . $m['tipe'] . " [" . $m['nomor_polisi'] . "]</option>";
             }
@@ -304,7 +307,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
         </label>
 
         <div class="flex items-center justify-end space-x-3 pt-5 mt-2 border-t dark:border-gray-700">
-          <button type="button" @click="isAddOpen = false" class="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors">Batal</button>
+          <button type="button" @click.stop="isAddOpen = false" class="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors">Batal</button>
           <button type="submit" name="tambah_manual_maintenance" class="px-5 py-2 text-sm font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-md">Simpan ke Bengkel</button>
         </div>
 

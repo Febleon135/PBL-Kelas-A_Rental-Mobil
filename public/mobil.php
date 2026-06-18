@@ -127,7 +127,7 @@ if (!empty($filter_tahun)) {
 
 $string_where = count($where_clauses) > 0 ? "WHERE " . implode(" AND ", $where_clauses) : "";
 
-// ─── LOGIKA ENGINE PAGINATION (BATAS 12 UNIT CARD) ───
+// ─── LOGIKA ENGINE PAGINATION ───
 $batas_data = 12;
 $halaman_aktif = isset($_GET['page']) ? intval($_GET['page']) : 1;
 if ($halaman_aktif < 1) $halaman_aktif = 1;
@@ -144,9 +144,7 @@ $total_halaman = ceil($total_mobil / $batas_data);
 <head>
   <?php include 'components/head.php'; ?>
   <style>
-    [x-cloak] {
-      display: none !important;
-    }
+    [x-cloak] { display: none !important; }
 
     .figma-grid {
       display: grid !important;
@@ -224,94 +222,106 @@ $total_halaman = ceil($total_mobil / $batas_data);
             $form_id = $row_id ? "MOB" . sprintf("%03d", substr($row_id['id_mobil'], 3) + 1) : "MOB001";
           ?>
             <div class="mb-4">
-              <a href="mobil.php" class="inline-flex items-center px-3 py-2 text-xs font-bold text-purple-700 bg-purple-100 rounded-lg hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-100">
+              <a href="mobil.php" class="inline-flex items-center px-3 py-2 text-xs font-bold text-purple-700 bg-purple-100 rounded-lg hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-100 shadow-sm transition-colors">
                 ← Kembali ke Galeri Armada
               </a>
             </div>
 
-            <div class="p-6 bg-white rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 dark:bg-gray-800 mb-8">
-              <h4 class="mb-4 font-bold text-gray-800 dark:text-gray-200 text-sm uppercase tracking-wide border-b pb-2 dark:border-gray-700">
-                TAMBAH DATA ARMADA MOBIL
+            <div class="p-8 bg-white rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 dark:bg-gray-800 mb-8 max-w-4xl mx-auto w-full">
+              <h4 class="mb-8 font-bold text-gray-800 dark:text-gray-200 text-sm uppercase tracking-wide border-b pb-3 dark:border-gray-700 flex items-center gap-2">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                TAMBAH DATA ARMADA MOBIL BARU
               </h4>
 
-              <form action="mobil.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium text-gray-700 dark:text-gray-300">
+              <form action="mobil.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="id_mobil" value="<?php echo $form_id; ?>">
 
-                <label class="block">
-                  <span>Kategori Kelas</span>
-                  <select name="id_kategori" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 dark:text-gray-100 focus:border-purple-400 focus:outline-none">
-                    <?php
-                    $kat = mysqli_query($conn, "SELECT * FROM kategori");
-                    while ($k = mysqli_fetch_assoc($kat)) {
-                      echo "<option value='" . $k['id_kategori'] . "'>" . $k['jenis_kategori'] . "</option>";
-                    }
-                    ?>
-                  </select>
-                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <!-- KOLOM KIRI -->
+                  <div>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Kategori Kelas</span>
+                      <select name="id_kategori" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-select focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5">
+                        <option value="">-- Pilih Kategori --</option>
+                        <?php
+                        $kat = mysqli_query($conn, "SELECT * FROM kategori");
+                        while ($k = mysqli_fetch_assoc($kat)) {
+                          echo "<option value='" . $k['id_kategori'] . "'>" . $k['jenis_kategori'] . "</option>";
+                        }
+                        ?>
+                      </select>
+                    </label>
 
-                <label class="block">
-                  <span>Merk Mobil</span>
-                  <input type="text" name="merk" required placeholder="Contoh: Toyota" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Merk Kendaraan</span>
+                      <input type="text" name="merk" required placeholder="Contoh: Toyota" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Tipe Unit</span>
-                  <input type="text" name="tipe" required placeholder="Contoh: Fortuner" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Tipe / Model Unit</span>
+                      <input type="text" name="tipe" required placeholder="Contoh: Fortuner" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Nomor Polisi (Plat)</span>
-                  <input type="text" name="nomor_polisi" required placeholder="Contoh: D 6402 UD" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Nomor Polisi (Plat)</span>
+                      <input type="text" name="nomor_polisi" required placeholder="Contoh: D 6402 UD" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Tahun Perakitan</span>
-                  <input type="number" name="tahun" required placeholder="Contoh: 2026" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Tahun Perakitan</span>
+                      <input type="number" name="tahun" required placeholder="Contoh: 2026" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
+                    
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Warna Body Kendaraan</span>
+                      <input type="text" name="warna" required placeholder="Contoh: Putih Mutiara" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
+                  </div>
 
-                <label class="block">
-                  <span>Masa Berlaku Pajak</span>
-                  <input type="date" name="pajak" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                  <!-- KOLOM KANAN -->
+                  <div>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Masa Berlaku Pajak STNK</span>
+                      <input type="date" name="pajak" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Warna Kendaraan</span>
-                  <input type="text" name="warna" required placeholder="Contoh: Putih" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Kapasitas Maksimal Kursi</span>
+                      <input type="number" name="kapasitas" required placeholder="Contoh: 7" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Harga Sewa / Hari (Rp)</span>
-                  <input type="number" name="harga_sewa_per_hari" required placeholder="Contoh: 500000" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Harga Sewa Pokok / Hari (Rp)</span>
+                      <input type="number" name="harga_sewa_per_hari" required placeholder="Contoh: 500000" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+                    </label>
 
-                <label class="block">
-                  <span>Kapasitas Kursi</span>
-                  <input type="number" name="kapasitas" required placeholder="Contoh: 7" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-                </label>
+                    <label class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Status Awal Garasi</span>
+                      <select name="status_mobil" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-select focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5">
+                        <option value="Tersedia">Tersedia</option>
+                        <option value="Disewa">Disewa</option>
+                        <option value="Persiapan Unit">Persiapan Unit</option>
+                        <option value="Maintenance">Maintenance</option>
+                      </select>
+                    </label>
 
-                <label class="block">
-                  <span>Status Awal</span>
-                  <select name="status_mobil" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none">
-                    <option value="tersedia">Tersedia</option>
-                    <option value="maintenance">Maintenance</option>
-                  </select>
-                </label>
-
-                <div class="block md:col-span-2">
-                  <span>Foto Unit Kendaraan</span>
-                  <input type="file" name="gambar" accept="image/*" required class="block w-full mt-1" />
+                    <div class="block text-sm mb-6">
+                      <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Foto Tampak Unit Kendaraan</span>
+                      <input type="file" name="gambar" accept="image/*" required class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:text-gray-400 transition-colors" />
+                    </div>
+                  </div>
                 </div>
 
-                <div class="flex items-center justify-end space-x-2 pt-4 border-t dark:border-gray-700 md:col-span-2">
-                  <a href="mobil.php" class="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</a>
-                  <button type="submit" name="save_mobil" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow">Save</button>
+                <div class="flex items-center justify-end space-x-3 pt-6 mt-4 border-t border-gray-100 dark:border-gray-700">
+                  <a href="mobil.php" class="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors shadow-sm">Batal</a>
+                  <button type="submit" name="save_mobil" class="px-5 py-2.5 text-sm font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-md">Simpan Data Unit</button>
                 </div>
               </form>
             </div>
 
           <?php
             // =========================================================================
-            // VIEW B: ETALASE UTAMA + BAR MULTI-FILTER TRIPLE & TOMBOL ADD SEBARIS
+            // VIEW B: ETALASE UTAMA + BAR MULTI-FILTER TRIPLE
             // =========================================================================
           } else {
           ?>
@@ -333,9 +343,10 @@ $total_halaman = ceil($total_mobil / $batas_data);
 
                 <select name="filter_status" class="text-xs p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:border-purple-400 border-gray-200 dark:border-gray-600">
                   <option value="">-- Status --</option>
-                  <option value="tersedia" <?php if ($filter_status == 'tersedia') echo 'selected'; ?>>Tersedia</option>
-                  <option value="disewa" <?php if ($filter_status == 'disewa') echo 'selected'; ?>>Disewa</option>
-                  <option value="maintenance" <?php if ($filter_status == 'maintenance') echo 'selected'; ?>>Maintenance</option>
+                  <option value="Tersedia" <?php if ($filter_status == 'Tersedia') echo 'selected'; ?>>Tersedia</option>
+                  <option value="Disewa" <?php if ($filter_status == 'Disewa') echo 'selected'; ?>>Disewa</option>
+                  <option value="Persiapan Unit" <?php if ($filter_status == 'Persiapan Unit') echo 'selected'; ?>>Persiapan Unit</option>
+                  <option value="Maintenance" <?php if ($filter_status == 'Maintenance') echo 'selected'; ?>>Maintenance</option>
                 </select>
 
                 <select name="filter_tahun" class="text-xs p-2.5 rounded-lg border bg-gray-50 dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:border-purple-400 border-gray-200 dark:border-gray-600">
@@ -375,15 +386,15 @@ $total_halaman = ceil($total_mobil / $batas_data);
 
               if (mysqli_num_rows($cars) > 0) {
                 while ($c = mysqli_fetch_assoc($cars)) {
-                  $badge_text  = "Tersedia";
-                  $badge_style = "text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400";
-                  if ($c['status_mobil'] == 'disewa') {
-                    $badge_text = "Disewa";
+                  $status_cek = strtolower($c['status_mobil']);
+                  if ($status_cek == 'disewa') {
                     $badge_style = "text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400";
-                  }
-                  if ($c['status_mobil'] == 'maintenance') {
-                    $badge_text = "Maintenance";
+                  } elseif ($status_cek == 'maintenance') {
                     $badge_style = "text-amber-700 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-400";
+                  } elseif ($status_cek == 'persiapan unit') {
+                    $badge_style = "text-teal-700 bg-teal-100 dark:bg-teal-900/40 dark:text-teal-400";
+                  } else {
+                    $badge_style = "text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400";
                   }
 
                   $payload_json = json_encode([
@@ -401,7 +412,7 @@ $total_halaman = ceil($total_mobil / $batas_data);
                     'harga_raw' => $c['harga_sewa_per_hari'],
                     'caps' => $c['kapasitas'],
                     'status' => $c['status_mobil'],
-                    'status_txt' => $badge_text,
+                    'status_txt' => $c['status_mobil'],
                     'gbr' => $c['gambar']
                   ]);
               ?>
@@ -426,7 +437,7 @@ $total_halaman = ceil($total_mobil / $batas_data);
 
                     <div class="w-full flex justify-center pt-2 border-t border-gray-100 dark:border-gray-700 mt-auto">
                       <span class="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded uppercase <?php echo $badge_style; ?>">
-                        <span class="w-1.5 h-1.5 mr-1.5 rounded-full" style="background-color: currentColor;"></span><?php echo $badge_text; ?>
+                        <span class="w-1.5 h-1.5 mr-1.5 rounded-full" style="background-color: currentColor;"></span><?php echo $c['status_mobil']; ?>
                       </span>
                     </div>
                   </div>
@@ -485,12 +496,12 @@ $total_halaman = ceil($total_mobil / $batas_data);
     </div>
   </div>
 
-  <div x-show="isActionMenuOpen" x-cloak
-    style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.5) !important; backdrop-filter: blur(4px) !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;">
+  <!-- POP-UP MENU AKSI (DIPERBAIKI DENGAN TAILWIND CLASS MURNI) -->
+  <div x-show="isActionMenuOpen" x-cloak x-transition
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
 
     <div @click.away="isActionMenuOpen = false"
-      class="bg-white dark:bg-gray-800 rounded-2xl p-6 text-center shadow-2xl border border-gray-100 dark:border-gray-700"
-      style="width: 280px !important; position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; cursor: default;">
+      class="bg-white dark:bg-gray-800 rounded-2xl p-6 text-center shadow-2xl border border-gray-100 dark:border-gray-700 w-[280px] cursor-default">
 
       <div class="mb-5">
         <span class="px-2.5 py-0.5 rounded-md font-mono text-[10px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 uppercase tracking-wider" x-text="targetMobil.plat"></span>
@@ -498,13 +509,13 @@ $total_halaman = ceil($total_mobil / $batas_data);
       </div>
 
       <div class="flex flex-col space-y-2 text-xs font-bold">
-        <button @click="isActionMenuOpen = false; isDetailOpen = true"
+        <button @click.prevent.stop="isActionMenuOpen = false; setTimeout(() => { isDetailOpen = true; }, 150)"
           class="w-full py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition duration-150 shadow-sm">
           Detail Spesifikasi
         </button>
 
         <?php if ($_SESSION['role'] !== 'staff'): ?>
-          <button @click="isActionMenuOpen = false; isEditOpen = true"
+          <button @click.prevent.stop="isActionMenuOpen = false; setTimeout(() => { isEditOpen = true; }, 150)"
             class="w-full py-2.5 text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-900/60 rounded-xl transition duration-150">
             Edit Data Unit
           </button>
@@ -529,15 +540,15 @@ $total_halaman = ceil($total_mobil / $batas_data);
     </div>
   </div>
 
-  <div x-show="isDetailOpen" x-cloak
-    style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.4) !important; backdrop-filter: blur(4px) !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 16px !important;">
+  <!-- POP-UP DETAIL MOBIL (DIPERBAIKI DENGAN TAILWIND CLASS MURNI) -->
+  <div x-show="isDetailOpen" x-cloak x-transition
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
 
-    <div @click.away="isDetailOpen = false" class="w-full max-w-xl bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 text-xs text-left" role="dialog"
-      style="cursor: default; position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;">
+    <div @click.away="isDetailOpen = false" class="w-full max-w-xl bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 text-xs text-left cursor-default" role="dialog">
 
       <header class="flex justify-between items-center border-b pb-3 mb-4 dark:border-gray-700">
         <p class="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider text-xs">Spesifikasi Detail Armada</p>
-        <button type="button" @click="isDetailOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-sm">✕</button>
+        <button type="button" @click.stop="isDetailOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-sm">✕</button>
       </header>
 
       <div class="flex flex-col sm:flex-row gap-5 items-stretch">
@@ -588,7 +599,7 @@ $total_halaman = ceil($total_mobil / $batas_data);
           </div>
 
           <div class="flex justify-end pt-4 mt-3 border-t dark:border-gray-700">
-            <button type="button" @click="isDetailOpen = false" class="px-4 py-1.5 font-bold text-xs text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition shadow-sm">
+            <button type="button" @click.stop="isDetailOpen = false" class="px-4 py-1.5 font-bold text-xs text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition shadow-sm">
               Oke, Tutup
             </button>
           </div>
@@ -599,85 +610,98 @@ $total_halaman = ceil($total_mobil / $batas_data);
     </div>
   </div>
 
-  <div x-show="isEditOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" x-transition>
-    <div @click.away="isEditOpen = false" class="w-full max-w-xl bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 text-xs" role="dialog">
-      <header class="flex justify-between items-center border-b pb-2 mb-4 dark:border-gray-700">
-        <p class="font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Form Update Data Kendaraan</p>
-        <button @click="isEditOpen = false" class="text-gray-400 hover:text-gray-600 font-bold text-sm">✕</button>
+  <!-- POP-UP EDIT DATA MOBIL -->
+  <div x-show="isEditOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" x-transition>
+    <div @click.away="isEditOpen = false" class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-100 dark:border-gray-700 text-sm overflow-y-auto max-h-[90vh]" role="dialog">
+      <header class="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+        <h4 class="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide flex items-center gap-2">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          Form Update Spesifikasi Kendaraan
+        </h4>
+        <button @click.stop="isEditOpen = false" type="button" class="text-gray-400 hover:text-red-500 font-bold text-lg transition-colors">✕</button>
       </header>
 
-      <form action="mobil.php" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-700 dark:text-gray-300">
+      <form action="mobil.php" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="id_mobil" :value="targetMobil.id">
 
-        <label class="block">
-          <span>Kategori Kelas</span>
-          <select name="id_kategori" :value="targetMobil.kat_id" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none">
-            <?php
-            $kat2 = mysqli_query($conn, "SELECT * FROM kategori");
-            while ($k2 = mysqli_fetch_assoc($kat2)) {
-              echo "<option value='" . $k2['id_kategori'] . "'>" . $k2['jenis_kategori'] . "</option>";
-            }
-            ?>
-          </select>
-        </label>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Kolom Kiri -->
+          <div>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Kategori Kelas</span>
+              <select name="id_kategori" :value="targetMobil.kat_id" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-select focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5">
+                <?php
+                $kat2 = mysqli_query($conn, "SELECT * FROM kategori");
+                while ($k2 = mysqli_fetch_assoc($kat2)) {
+                  echo "<option value='" . $k2['id_kategori'] . "'>" . $k2['jenis_kategori'] . "</option>";
+                }
+                ?>
+              </select>
+            </label>
 
-        <label class="block">
-          <span>Merk Mobil</span>
-          <input type="text" name="merk" :value="targetMobil.merk" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Merk Kendaraan</span>
+              <input type="text" name="merk" :value="targetMobil.merk" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Tipe Unit</span>
-          <input type="text" name="tipe" :value="targetMobil.tipe" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Tipe / Model Unit</span>
+              <input type="text" name="tipe" :value="targetMobil.tipe" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Nomor Polisi (Plat)</span>
-          <input type="text" name="nomor_polisi" :value="targetMobil.plat" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Nomor Polisi (Plat)</span>
+              <input type="text" name="nomor_polisi" :value="targetMobil.plat" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Tahun Perakitan</span>
-          <input type="number" name="tahun" :value="targetMobil.thn" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Tahun Perakitan</span>
+              <input type="number" name="tahun" :value="targetMobil.thn" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Masa Berlaku Pajak</span>
-          <input type="date" name="pajak" :value="targetMobil.pajak_raw" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Warna Body Kendaraan</span>
+              <input type="text" name="warna" :value="targetMobil.warna" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
+          </div>
 
-        <label class="block">
-          <span>Warna Kendaraan</span>
-          <input type="text" name="warna" :value="targetMobil.warna" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+          <!-- Kolom Kanan -->
+          <div>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Masa Berlaku Pajak STNK</span>
+              <input type="date" name="pajak" :value="targetMobil.pajak_raw" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Harga Sewa / Hari (Rp)</span>
-          <input type="number" name="harga_sewa_per_hari" :value="targetMobil.harga_raw" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Harga Sewa / Hari (Rp)</span>
+              <input type="number" name="harga_sewa_per_hari" :value="targetMobil.harga_raw" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Kapasitas Kursi</span>
-          <input type="number" name="kapasitas" :value="targetMobil.caps" required class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none" />
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Kapasitas Kursi</span>
+              <input type="number" name="kapasitas" :value="targetMobil.caps" required class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
+            </label>
 
-        <label class="block">
-          <span>Status Armada</span>
-          <select name="status_mobil" :value="targetMobil.status" class="block w-full mt-1 p-2 rounded border dark:bg-gray-700 focus:outline-none">
-            <option value="tersedia">Tersedia</option>
-            <option value="disewa">Disewa</option>
-            <option value="maintenance">Maintenance</option>
-          </select>
-        </label>
+            <label class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Status Armada</span>
+              <select name="status_mobil" :value="targetMobil.status" class="block w-full text-sm dark:bg-gray-700 dark:text-gray-200 form-select focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5">
+                <option value="Tersedia">Tersedia</option>
+                <option value="Disewa">Disewa</option>
+                <option value="Persiapan Unit">Persiapan Unit</option>
+                <option value="Maintenance">Maintenance</option>
+              </select>
+            </label>
 
-        <div class="block md:col-span-2">
-          <span>Ganti Gambar Baru (Opsional)</span>
-          <input type="file" name="gambar" accept="image/*" class="block w-full mt-1 text-gray-400" />
+            <div class="block text-sm mb-6">
+              <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Ganti Gambar Baru (Opsional)</span>
+              <input type="file" name="gambar" accept="image/*" class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:text-gray-400 transition-colors" />
+            </div>
+          </div>
         </div>
 
-        <div class="flex justify-end space-x-2 pt-4 border-t dark:border-gray-700 md:col-span-2">
-          <button type="button" @click="isEditOpen = false" class="px-4 py-2 font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Batal</button>
-          <button type="submit" name="update_mobil" class="px-4 py-2 font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 shadow">Update Data</button>
+        <div class="flex justify-end space-x-3 pt-6 mt-2 border-t border-gray-100 dark:border-gray-700">
+          <button type="button" @click.stop="isEditOpen = false" class="px-5 py-2.5 font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors shadow-sm">Batal</button>
+          <button type="submit" name="update_mobil" class="px-5 py-2.5 font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-700 shadow-md transition-colors">Simpan Perubahan</button>
         </div>
       </form>
     </div>

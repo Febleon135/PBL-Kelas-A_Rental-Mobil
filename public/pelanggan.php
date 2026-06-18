@@ -123,42 +123,42 @@ if (isset($_GET['delete_id'])) {
               </a>
             </div>
 
-            <div class="p-6 bg-white rounded-lg shadow-md dark:bg-gray-800 mb-8">
-              <h4 class="mb-4 font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide border-b pb-2 dark:border-gray-700">
+            <div class="p-8 bg-white rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 dark:bg-gray-800 mb-8 max-w-2xl mx-auto w-full">
+              <h4 class="mb-6 font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide border-b pb-3 dark:border-gray-700">
                 <?php echo $isEdit ? 'EDIT DATA PELANGGAN' : 'TAMBAH DATA PELANGGAN'; ?>
               </h4>
 
-              <form action="pelanggan.php" method="POST" class="space-y-4 max-w-2xl">
+              <form action="pelanggan.php" method="POST" class="space-y-5">
                 <input type="hidden" name="action_form" value="<?php echo $_GET['action']; ?>">
 
                 <label class="block text-sm">
                   <span class="text-gray-700 dark:text-gray-400 font-medium">ID Pelanggan</span>
-                  <input type="text" name="id_pelanggan" value="<?php echo $form_id; ?>" readonly class="block w-full mt-1 text-sm bg-gray-100 dark:bg-gray-700 dark:text-gray-300 form-input" />
+                  <input type="text" name="id_pelanggan" value="<?php echo $form_id; ?>" readonly class="block w-full mt-1.5 text-sm bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded-lg p-2.5 border-gray-200 dark:border-gray-600 cursor-not-allowed font-mono font-bold text-purple-600" />
                 </label>
 
                 <label class="block text-sm">
-                  <span class="text-gray-700 dark:text-gray-400 font-medium">Nama Pelanggan</span>
-                  <input type="text" name="nama_pelanggan" value="<?php echo $form_nama; ?>" required placeholder="Masukkan Nama Pelanggan" class="block w-full mt-1 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400" />
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Nama Lengkap Pelanggan</span>
+                  <input type="text" name="nama_pelanggan" value="<?php echo $form_nama; ?>" required placeholder="Masukkan Nama Pelanggan" class="block w-full mt-1.5 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
                 </label>
 
                 <label class="block text-sm">
-                  <span class="text-gray-700 dark:text-gray-400 font-medium">Nomor Telepon</span>
-                  <input type="text" name="no_telepon" value="<?php echo $form_telp; ?>" required placeholder="Masukkan Nomor Telepon" class="block w-full mt-1 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400" />
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Nomor Telepon / WhatsApp Aktif</span>
+                  <input type="text" name="no_telepon" value="<?php echo $form_telp; ?>" required placeholder="Masukkan Nomor Telepon" class="block w-full mt-1.5 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
                 </label>
 
                 <label class="block text-sm">
-                  <span class="text-gray-700 dark:text-gray-400 font-medium">Alamat</span>
-                  <input type="text" name="alamat" value="<?php echo $form_alamat; ?>" required placeholder="Masukkan Alamat" class="block w-full mt-1 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400" />
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Alamat Domisili</span>
+                  <input type="text" name="alamat" value="<?php echo $form_alamat; ?>" required placeholder="Masukkan Alamat" class="block w-full mt-1.5 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
                 </label>
 
                 <label class="block text-sm">
-                  <span class="text-gray-700 dark:text-gray-400 font-medium">NIK</span>
-                  <input type="text" name="NIK" value="<?php echo $form_nik; ?>" required placeholder="Masukkan NIK" class="block w-full mt-1 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400" />
+                  <span class="text-gray-700 dark:text-gray-400 font-medium">Nomor Induk Kependudukan (NIK)</span>
+                  <input type="text" name="NIK" value="<?php echo $form_nik; ?>" required placeholder="Masukkan NIK KTP Pelanggan" class="block w-full mt-1.5 text-sm dark:text-gray-300 dark:bg-gray-700 form-input focus:border-purple-400 focus:ring-purple-300 rounded-lg border-gray-300 dark:border-gray-600 p-2.5" />
                 </label>
 
-                <div class="flex items-center justify-end space-x-3 pt-4 border-t dark:border-gray-700">
-                  <a href="pelanggan.php" class="px-4 py-2 text-sm font-medium text-white bg-gray-500 rounded-lg hover:bg-gray-600">Cancel</a>
-                  <button type="submit" name="save_pelanggan" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
+                <div class="flex items-center justify-end space-x-3 pt-6 border-t dark:border-gray-700 mt-2">
+                  <a href="pelanggan.php" class="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors shadow-sm">Batal</a>
+                  <button type="submit" name="save_pelanggan" class="px-5 py-2.5 text-sm font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-md">Simpan Data</button>
                 </div>
               </form>
             </div>
@@ -216,7 +216,7 @@ if (isset($_GET['delete_id'])) {
                               <?php if ($_SESSION['role'] !== 'staff'): ?>
                                 <a href="pelanggan.php?delete_id=<?php echo $row['id_pelanggan']; ?>"
                                   onclick="return confirm('Apakah Anda yakin ingin menghapus data pelanggan <?php echo $row['nama_pelanggan']; ?> dari sistem WheelsRent?')"
-                                  class="flex items-center justify-center px-3 py-1.5 text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/60 rounded-lg transition-colors duration-150 shadow-sm gap-1">
+                                  class="flex items-center justify-center px-3 py-1.5 text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-700 dark:hover:bg-red-900/60 rounded-lg transition-colors duration-150 shadow-sm gap-1">
                                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path>
                                   </svg>
