@@ -3,13 +3,11 @@ session_start();
 include 'config.php';
 
 /** @var mysqli $conn */
-// PROTEKSI: Jika belum login, tendang ke login.php
 if (!isset($_SESSION['username'])) {
   header("Location: login.php");
   exit;
 }
 
-// Ambil ID Maintenance dari URL
 if (!isset($_GET['id']) || empty($_GET['id'])) {
   header("Location: maintenance.php");
   exit;
@@ -17,7 +15,6 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $id_maint = mysqli_real_escape_string($conn, $_GET['id']);
 
-// QUERY JOIN: Mengambil info mobil beserta rincian nota pengeluaran maintenance bengkel
 $query = "SELECT mn.*, m.merk, m.tipe, m.nomor_polisi, m.tahun, m.warna, m.gambar
           FROM maintenance mn
           JOIN mobil m ON mn.id_mobil = m.id_mobil
@@ -61,7 +58,7 @@ $data = mysqli_fetch_assoc($result);
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             
-            <!-- KOTAK KIRI: SPESIFIKASI ARMADA YANG MASUK BENGKEL -->
+            <!-- SPESIFIKASI ARMADA YANG MASUK BENGKEL -->
             <div class="md:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col items-center text-center text-xs">
               <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b pb-2 mb-4 w-full">Detail Armada</h3>
               
@@ -85,13 +82,11 @@ $data = mysqli_fetch_assoc($result);
               </div>
             </div>
 
-            <!-- KOTAK KANAN: JURNAL TINDAKAN & BIAYA SERVICE -->
             <div class="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-xs flex flex-col justify-between">
               <div>
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b pb-2 mb-4 dark:border-gray-700">Rincian Pengeluaran Finansial</h3>
 
                 <div class="space-y-4">
-                  <!-- TAMPILAN STATUS DINAMIS -->
                   <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
                     <span class="text-gray-600 dark:text-gray-400">Status Karantina</span>
                     <?php if ($data['status_maintenance'] === 'selesai'): ?>
@@ -101,7 +96,6 @@ $data = mysqli_fetch_assoc($result);
                     <?php endif; ?>
                   </div>
 
-                  <!-- TAMPILAN TANGGAL ESTIMASI AWAL -->
                   <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
                     <span class="text-gray-600 dark:text-gray-400">Estimasi Selesai (Awal)</span>
                     <span class="font-bold text-amber-600 dark:text-amber-500">
@@ -109,7 +103,6 @@ $data = mysqli_fetch_assoc($result);
                     </span>
                   </div>
 
-                  <!-- TAMPILAN TANGGAL AKTUAL (TGL SERVICE TERAKHIR) -->
                   <div class="flex justify-between items-center py-1 border-b dark:border-gray-700">
                     <span class="text-gray-600 dark:text-gray-400">Tanggal Aktual (Pencatatan)</span>
                     <span class="font-bold text-gray-800 dark:text-gray-200"><?php echo date('d F Y', strtotime($data['tgl_service'])); ?></span>
@@ -122,7 +115,6 @@ $data = mysqli_fetch_assoc($result);
                 </div>
               </div>
 
-              <!-- JURNAL MEKANIK -->
               <div class="mt-6 bg-purple-50 dark:bg-gray-700 p-4 rounded-lg border border-purple-100 dark:border-gray-600">
                 <p class="font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wide mb-1">Log Tindakan Mekanik / Bengkel:</p>
                 <p class="text-gray-700 dark:text-gray-200 italic font-medium">"<?php echo htmlspecialchars($data['keterangan']); ?>"</p>

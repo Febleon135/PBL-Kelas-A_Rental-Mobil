@@ -9,7 +9,6 @@ if (!isset($_SESSION['username'])) {
     exit;
 }
 
-// Ambil ID Transaksi dari URL
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     header("Location: penyewaan.php");
     exit;
@@ -37,7 +36,6 @@ if (mysqli_num_rows($result) == 0) {
 
 $data = mysqli_fetch_assoc($result);
 
-// Hitung Harga Kotor sebelum diskon untuk keperluan rincian nota
 $harga_kotor = ($data['harga_sewa_per_hari'] * $data['durasi_sewa']);
 ?>
 

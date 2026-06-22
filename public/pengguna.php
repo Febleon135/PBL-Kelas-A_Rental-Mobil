@@ -3,35 +3,29 @@ session_start();
 include 'config.php';
 
 /** @var mysqli $conn */
-// PROTEKSI DOUBLE: Jika belum login ATAU login tapi BUKAN owner, tendang ke dashboard
 if (!isset($_SESSION['username']) || $_SESSION['role'] !== 'owner') {
   header("Location: index.php");
   exit;
 }
 
-// ─── LOGIKA BACKEND 1: TAMBAH PENGGUNA BARU ───
 if (isset($_POST['tambah_user'])) {
   $nama_pengguna = mysqli_real_escape_string($conn, $_POST['nama_pengguna']);
   $username      = mysqli_real_escape_string($conn, $_POST['username']);
   $password      = $_POST['password']; 
   
-  // PERBAIKAN KEAMANAN: Password sekarang wajib di-hash agar sinkron dengan proses_login.php
   $password_hash = password_hash($password, PASSWORD_DEFAULT);
   $role          = mysqli_real_escape_string($conn, $_POST['role']);
 
-  // Auto-generate ID Pengguna (Contoh: USR001, USR002, dst)
   $q_id   = mysqli_query($conn, "SELECT id_pengguna FROM pengguna WHERE id_pengguna LIKE 'USR%' ORDER BY id_pengguna DESC LIMIT 1");
   $row_id = mysqli_fetch_assoc($q_id);
   $id_baru = $row_id ? "USR" . sprintf("%03d", substr($row_id['id_pengguna'], 3) + 1) : "USR001";
 
-  // Cek validasi agar tidak ada username kembar (duplicate)
   $cek_user = mysqli_query($conn, "SELECT username FROM pengguna WHERE username = '$username'");
   if (mysqli_num_rows($cek_user) > 0) {
     header("Location: pengguna.php?status=duplicate");
     exit;
   }
 
-  // Masukkan password_hash ke kolom database
   $insert = mysqli_query($conn, "INSERT INTO pengguna VALUES ('$id_baru', '$nama_pengguna', '$username', '$password_hash', '$role')");
   if ($insert) {
     header("Location: pengguna.php?status=add-success");
@@ -41,11 +35,9 @@ if (isset($_POST['tambah_user'])) {
   exit;
 }
 
-// ─── LOGIKA BACKEND 2: HAPUS HAK AKSES PENGGUNA ───
 if (isset($_GET['action']) && $_GET['action'] == 'delete') {
   $id_hapus = mysqli_real_escape_string($conn, $_GET['id']);
 
-  // Proteksi: Owner tidak boleh menghapus dirinya sendiri secara tidak sengaja
   if ($id_hapus === $_SESSION['id_pengguna'] || $id_hapus == 'USROOT') {
     header("Location: pengguna.php?status=denied");
     exit;
@@ -60,7 +52,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete') {
   exit;
 }
 
-// ─── LOGIKA FILTER PENCARIAN USERNAME ───
 $search_query = "";
 if (isset($_GET['search']) && !empty($_GET['search'])) {
   $keyword = mysqli_real_escape_string($conn, $_GET['search']);

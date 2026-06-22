@@ -11,7 +11,7 @@ if (!isset($_SESSION['username']) || ($_SESSION['role'] !== 'owner' && $_SESSION
 
 $role_sekarang = $_SESSION['role'];
 
-// ─── SETUP FILTER DINAMIS BULAN & TAHUN ───
+// ───  FILTER DINAMIS BULAN & TAHUN ───
 $q_tahun = mysqli_query($conn, "SELECT MIN(YEAR(tanggal_sewa)) as tahun_awal FROM transaksi_rental");
 $r_tahun = mysqli_fetch_assoc($q_tahun);
 $tahun_awal = $r_tahun['tahun_awal'] ?? date('Y');
@@ -27,7 +27,6 @@ $where_maintenance = "MONTH(mn.tgl_service) = '$filter_bulan' AND YEAR(mn.tgl_se
 $nama_bulan = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
 
-// ─── QUERY LOGISTIK & OPERASIONAL REAL-TIME ───
 $q_total_transaksi = mysqli_query($conn, "SELECT COUNT(*) as total FROM transaksi_rental t WHERE t.status_sewa = 'selesai' AND $where_transaksi");
 $r_total_transaksi = mysqli_fetch_assoc($q_total_transaksi);
 $total_transaksi = $r_total_transaksi['total'] ?? 0;
@@ -44,8 +43,6 @@ $q_fav = mysqli_query($conn, "SELECT m.merk, m.tipe, COUNT(t.id_mobil) as jumlah
 $r_fav = mysqli_fetch_assoc($q_fav);
 $mobil_terfavorit = $r_fav ? $r_fav['merk'] . " " . $r_fav['tipe'] . " (" . $r_fav['jumlah'] . "x)" : "Belum ada transaksi";
 
-
-// ─── QUERY FINANSIAL REAL-TIME ───
 $q_duit_sewa = mysqli_query($conn, "SELECT SUM(t.total_biaya) as total FROM transaksi_rental t WHERE t.status_sewa = 'selesai' AND $where_transaksi");
 $r_duit_sewa = mysqli_fetch_assoc($q_duit_sewa);
 $duit_sewa = $r_duit_sewa['total'] ?? 0;
@@ -76,37 +73,29 @@ $profit_bersih = $total_omzet - $total_bengkel;
 <head>
   <?php include 'components/head.php'; ?>
   <style>
-    /* MAGIC CSS UNTUK PRINT/CETAK PDF YANG SUDAH DI-FIX TOTAL */
     @media print {
       @page { margin: 1cm; size: auto; }
       
-      /* Reset Warna Background Kertas */
       body { background-color: white !important; }
       
-      /* Hapus Elemen yang Gak Perlu Diprint dengan display:none biar gak ninggalin ruang kosong */
       aside, header, #form-filter, #btn-cetak { display: none !important; }
       
-      /* Bongkar Struktur Flexbox Dashboard yang bikin margin nyangkut */
       .flex.h-screen { display: block !important; height: auto !important; overflow: visible !important; }
       .flex-col.flex-1 { display: block !important; width: 100% !important; }
       main { overflow: visible !important; height: auto !important; padding: 0 !important; margin: 0 !important; }
       
-      /* Paksa Container Utama Jadi 100% Lebar Kertas */
       .container { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
       
-      /* Paksa Grid Box Card Menjadi 2 Kolom Sejajar (Biar Gak Memanjang ke Bawah) */
       .grid.gap-6.mb-8 {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 1rem !important;
       }
       
-      /* Kalibrasi Ulang Warna Text & Border untuk Mode Print */
       .dark\:bg-gray-900, .dark\:bg-gray-800, .bg-white { background-color: white !important; }
       .dark\:text-white, .dark\:text-gray-200, .text-gray-800, .text-gray-900 { color: black !important; }
       .shadow-sm, .shadow-md { box-shadow: none !important; border: 1px solid #d1d5db !important; }
       
-      /* Render Background Berwarna (Badge & Icon) Secara Presisi */
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
   </style>
@@ -205,7 +194,7 @@ $profit_bersih = $total_omzet - $total_bengkel;
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
               </div>
               <div>
-                <p class="text-2xl font-extrabold text-gray-800 dark:text-gray-100"><?php echo $total_transaksi; ?> Rit</p>
+                <p class="text-2xl font-extrabold text-gray-800 dark:text-gray-100"><?php echo $total_transaksi; ?> </p>
                 <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1">Transaksi Selesai</p>
               </div>
             </div>

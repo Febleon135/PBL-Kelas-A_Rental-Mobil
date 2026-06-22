@@ -3,6 +3,8 @@ session_start();
 include 'config.php';
 
 /** @var mysqli $conn */
+
+// Check user session
 if (!isset($_SESSION['username'])) {
   header("Location: login.php");
   exit;
@@ -10,7 +12,7 @@ if (!isset($_SESSION['username'])) {
 
 date_default_timezone_set('Asia/Jakarta');
 
-// ─── QUERY UMUM (SUDAH DISINKRONKAN DENGAN ENUM BARU) ───
+// Fetch general dashboard statistics
 $q_pelanggan = mysqli_query($conn, "SELECT COUNT(*) as total FROM pelanggan");
 $r_pelanggan = mysqli_fetch_assoc($q_pelanggan);
 
@@ -26,13 +28,13 @@ $r_mobil_total = mysqli_fetch_assoc($q_mobil_total);
 $q_mobil_mt = mysqli_query($conn, "SELECT COUNT(*) as total FROM mobil WHERE status_mobil = 'Maintenance'");
 $r_mobil_mt = mysqli_fetch_assoc($q_mobil_mt);
 
-// ─── QUERY TAMBAHAN KHUSUS ADMIN/STAFF ───
 $q_mobil_rented = mysqli_query($conn, "SELECT COUNT(*) as total FROM mobil WHERE status_mobil IN ('Disewa', 'Persiapan Unit')");
 $r_mobil_rented = mysqli_fetch_assoc($q_mobil_rented);
 
 $q_sewa_done = mysqli_query($conn, "SELECT COUNT(*) as total FROM transaksi_rental WHERE status_sewa = 'Selesai'");
 $r_sewa_done = mysqli_fetch_assoc($q_sewa_done);
 
+// Calculate financial metrics based on user roles
 $total_denda = 0;
 $total_omzet = 0;
 
@@ -46,7 +48,7 @@ if ($_SESSION['role'] === 'owner' || $_SESSION['role'] === 'admin') {
   $total_omzet = $r_omzet['total'] ?? 0;
 }
 
-// ─── LOGIKA PAGINATION ───
+// Pagination logic for recent transactions table
 $batas_data = 10;
 $halaman_aktif = isset($_GET['p_trans']) ? intval($_GET['p_trans']) : 1;
 if ($halaman_aktif < 1) $halaman_aktif = 1;
@@ -76,7 +78,6 @@ $total_halaman = ceil($total_semua_transaksi / $batas_data);
       <main class="h-full overflow-y-auto">
         <div class="container px-6 mx-auto grid">
 
-          <!-- HEADER HALAMAN DENGAN ROLE BADGE -->
           <div class="my-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-200">
               Selamat Datang, <span class="font-black text-purple-600 dark:text-purple-400"><?php echo htmlspecialchars($_SESSION['nama_pengguna']); ?></span>
@@ -86,7 +87,6 @@ $total_halaman = ceil($total_semua_transaksi / $batas_data);
             </span>
           </div>
 
-          <!-- FIX LAYOUT GRID: Pakai class yang dijamin tembus compiler Windmill (xl:grid-cols-3) -->
           <div class="grid gap-6 mb-10 md:grid-cols-2 xl:grid-cols-3">
 
             <div class="flex items-center p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm transition-transform duration-200 hover:-translate-y-1">
@@ -147,7 +147,7 @@ $total_halaman = ceil($total_semua_transaksi / $batas_data);
                 </div>
                 <div>
                   <p class="text-2xl font-black text-gray-700 dark:text-gray-200">Rp <?php echo number_format($total_omzet, 0, ',', '.'); ?></p>
-                  <p class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">Total Pendapatan (Bulan Ini)</p>
+                  <p class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">Total Pendapatan</p>
                 </div>
               </div>
 
@@ -159,14 +159,13 @@ $total_halaman = ceil($total_semua_transaksi / $batas_data);
                 </div>
                 <div>
                   <p class="text-2xl font-black text-gray-700 dark:text-gray-200">Rp <?php echo number_format($total_denda, 0, ',', '.'); ?></p>
-                  <p class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">Total Denda Ditagih (Bulan Ini)</p>
+                  <p class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">Total Denda Ditagih</p>
                 </div>
               </div>
             <?php endif; ?>
 
           </div>
 
-          <!-- WIDGET: DAFTAR MOBIL BELUM KEMBALI -->
           <div class="flex items-center justify-between mb-4 mt-2">
             <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest border-l-4 border-blue-500 pl-3">
               Radar Unit Keluar (Belum Kembali)
@@ -234,7 +233,6 @@ $total_halaman = ceil($total_semua_transaksi / $batas_data);
             </div>
           </div>
 
-          <!-- TABEL TRANSAKSI TERBARU (HISTORY UMUM) -->
           <div class="flex items-center mb-4">
             <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest border-l-4 border-purple-500 pl-3">
               Arsip Transaksi Terbaru

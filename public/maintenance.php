@@ -9,7 +9,6 @@ if (!isset($_SESSION['username'])) {
   exit;
 }
 
-// ─── 1. LOGIKA TAMBAH MANUAL MAINTENANCE BARU ───
 if (isset($_POST['tambah_manual_maintenance'])) {
   $id_mobil_manual = mysqli_real_escape_string($conn, $_POST['id_mobil_manual']);
   $keterangan_awal = mysqli_real_escape_string($conn, $_POST['keterangan_awal']);
@@ -18,16 +17,13 @@ if (isset($_POST['tambah_manual_maintenance'])) {
   
   mysqli_begin_transaction($conn);
 
-  // Buat ID Maintenance Baru
   $q_id_m = mysqli_query($conn, "SELECT id_maintenance FROM maintenance ORDER BY id_maintenance DESC LIMIT 1");
   $row_id_m = mysqli_fetch_assoc($q_id_m);
   $id_maint_baru = $row_id_m ? "MNT" . sprintf("%03d", substr($row_id_m['id_maintenance'], 3) + 1) : "MNT001";
 
-  // Masukkan ke tabel maintenance dengan status 'proses'
   $ins_maint = mysqli_query($conn, "INSERT INTO maintenance (id_maintenance, id_mobil, tgl_service, tgl_estimasi, biaya_service, status_maintenance, keterangan) 
                                     VALUES ('$id_maint_baru', '$id_mobil_manual', '$tgl_masuk', '$tgl_estimasi', 0, 'proses', 'Service Manual: $keterangan_awal')");
 
-  // Ubah status mobil di pool menjadi 'Maintenance' (Sesuai ENUM baru)
   $upd_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'Maintenance' WHERE id_mobil = '$id_mobil_manual'");
 
   if ($ins_maint && $upd_mobil) {
@@ -41,7 +37,6 @@ if (isset($_POST['tambah_manual_maintenance'])) {
   }
 }
 
-// ─── 2. LOGIKA UPDATE / EDIT SAAT MASIH PROSES ───
 if (isset($_POST['update_proses_maintenance'])) {
   $id_maint_upd = mysqli_real_escape_string($conn, $_POST['id_maintenance_edit']);
   $tgl_estimasi_upd = mysqli_real_escape_string($conn, $_POST['tgl_estimasi_edit']);
@@ -56,7 +51,6 @@ if (isset($_POST['update_proses_maintenance'])) {
   exit;
 }
 
-// ─── 3. LOGIKA SELESAI MAINTENANCE BENGKEL (FINISH) ───
 if (isset($_POST['proses_selesai_maintenance'])) {
   $id_mobil_fix   = mysqli_real_escape_string($conn, $_POST['id_mobil']);
   $id_maint_fix   = mysqli_real_escape_string($conn, $_POST['id_maintenance']);
@@ -66,10 +60,8 @@ if (isset($_POST['proses_selesai_maintenance'])) {
 
   mysqli_begin_transaction($conn);
 
-  // 1. Kembalikan status armada mobil menjadi Tersedia (Sesuai ENUM baru)
   $u_mobil = mysqli_query($conn, "UPDATE mobil SET status_mobil = 'Tersedia' WHERE id_mobil = '$id_mobil_fix'");
 
-  // 2. Perbarui data di tabel maintenance: isi biaya, tanggal fix, keterangan akhir, dan ubah ke 'selesai'
   $u_maint = mysqli_query($conn, "UPDATE maintenance 
                                   SET tgl_service = '$tgl_selesai', 
                                       biaya_service = '$biaya_service', 
@@ -88,7 +80,6 @@ if (isset($_POST['proses_selesai_maintenance'])) {
   }
 }
 
-// ─── FILTER STATUS (PROSES VS SELESAI) ───
 $filter_status = isset($_GET['filter_status']) ? $_GET['filter_status'] : 'proses';
 $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 'selesai'" : "WHERE mn.status_maintenance = 'proses'";
 ?>
@@ -98,8 +89,45 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
 
 <head>
   <?php include 'components/head.php'; ?>
+  
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
   <style>
     [x-cloak] { display: none !important; }
+
+    /* CUSTOM CSS TOMSELECT AGAR MENYATU DENGAN WINDMILL TAILWIND (LIGHT & DARK MODE) */
+    .ts-wrapper { padding: 0 !important; border: none !important; }
+    .ts-control {
+      border-radius: 0.5rem !important; /* rounded-lg */
+      padding: 0.625rem !important; /* p-2.5 */
+      font-size: 0.875rem !important; /* text-sm */
+      border: 1px solid #d1d5db !important; /* border-gray-300 */
+      background-color: #fff !important; 
+      box-shadow: none !important;
+      min-height: 42px !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+    .ts-control > input { font-size: 0.875rem !important; }
+    .ts-dropdown { font-size: 0.875rem !important; border-radius: 0.5rem !important; z-index: 99999 !important; }
+    
+    .theme-dark .ts-control {
+      background-color: #374151 !important; /* dark:bg-gray-700 */
+      border-color: #4b5563 !important; /* dark:border-gray-600 */
+      color: #e5e7eb !important; /* dark:text-gray-200 */
+    }
+    .theme-dark .ts-control input { color: #e5e7eb !important; }
+    .theme-dark .ts-dropdown {
+      background-color: #374151 !important;
+      border-color: #4b5563 !important;
+      color: #e5e7eb !important;
+    }
+    .theme-dark .ts-dropdown .option:hover,
+    .theme-dark .ts-dropdown .option.active {
+      background-color: #4b5563 !important;
+      color: #fff !important;
+    }
   </style>
 </head>
 
@@ -173,7 +201,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors" x-data="{ isEditing: false }">
                           <td class="px-4 py-3">
                             <p class="font-bold text-purple-600 dark:text-purple-400"><?php echo $row['id_maintenance']; ?></p>
-                            <p class="font-mono text-[10px] text-gray-500 mt-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded inline-block border dark:border-gray-600"><?php echo $row['nomor_polisi']; ?></p>
+                            <p class="font-mono text-xs text-gray-500 mt-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded inline-block border dark:border-gray-600"><?php echo $row['nomor_polisi']; ?></p>
                           </td>
                           <td class="px-4 py-3 flex items-center gap-3">
                             <div class="w-12 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center border dark:border-gray-600 shrink-0">
@@ -183,43 +211,43 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                           </td>
                           <td class="px-4 py-3">
                             <div class="mb-1.5">
-                              <p class="text-[9px] font-bold text-gray-800 uppercase">Tgl Masuk Bengkel:</p>
-                              <p class="font-bold text-gray-800 dark:text-gray-200 text-[11px]"><?php echo date('d M Y', strtotime($row['tgl_service'])); ?></p>
+                              <p class="text-[10px] font-bold text-gray-800 uppercase dark:text-gray-400">Tgl Masuk Bengkel:</p>
+                              <p class="font-bold text-gray-800 dark:text-gray-200 text-xs"><?php echo date('d M Y', strtotime($row['tgl_service'])); ?></p>
                             </div>
                             <div>
-                              <p class="text-[9px] font-bold text-amber-500 uppercase">Estimasi Beres:</p>
-                              <p class="font-bold text-amber-600 text-[11px]"><?php echo empty($row['tgl_estimasi']) ? 'Belum Diatur' : date('d M Y', strtotime($row['tgl_estimasi'])); ?></p>
+                              <p class="text-[10px] font-bold text-amber-500 uppercase">Estimasi Beres:</p>
+                              <p class="font-bold text-amber-600 text-xs"><?php echo empty($row['tgl_estimasi']) ? 'Belum Diatur' : date('d M Y', strtotime($row['tgl_estimasi'])); ?></p>
                             </div>
                           </td>
                           <td class="px-4 py-3">
-                            <span class="px-2 py-1 text-[10px] font-bold text-amber-800 bg-amber-100 rounded-md uppercase">Sedang Proses</span>
+                            <span class="px-2 py-1 text-[10px] font-bold text-amber-800 bg-amber-100 rounded-md uppercase dark:bg-amber-900 dark:text-amber-400">Sedang Proses</span>
                           </td>
                           <td class="px-4 py-3">
                             
-                            <div x-show="!isEditing" class="flex flex-col gap-2 min-w-[200px]">
-                              <p class="text-xs text-gray-500 italic border-l-2 border-purple-400 pl-2 leading-tight">"<?php echo htmlspecialchars($row['keterangan']); ?>"</p>
+                            <div x-show="!isEditing" class="flex flex-col gap-2" style="min-width: 200px;">
+                              <p class="text-xs text-gray-500 italic border-l-2 border-purple-400 pl-2 leading-tight dark:text-gray-400">"<?php echo htmlspecialchars($row['keterangan']); ?>"</p>
                               <div class="flex items-center gap-2 mt-1">
-                                <button type="button" @click.prevent.stop="isEditing = true" class="px-3 py-1 text-[10px] font-bold text-blue-600 border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition-colors">Ubah Est / Log</button>
+                                <button type="button" @click.prevent.stop="isEditing = true" class="px-3 py-1 text-[10px] font-bold text-blue-600 border border-blue-600 rounded hover:bg-blue-600 hover:text-white transition-colors dark:text-blue-400 dark:border-blue-400 dark:hover:bg-blue-600 dark:hover:text-white">Ubah Est / Log</button>
                                 
                                 <form action="maintenance.php" method="POST" class="flex m-0 gap-1" onsubmit="return confirm('Apakah unit ini benar-benar selesai diperbaiki dan nota biaya sudah final?')">
                                   <input type="hidden" name="id_mobil" value="<?php echo $row['id_mobil']; ?>">
                                   <input type="hidden" name="id_maintenance" value="<?php echo $row['id_maintenance']; ?>">
                                   <input type="hidden" name="keterangan" value="<?php echo htmlspecialchars($row['keterangan']); ?> - (FINAL)">
                                   
-                                  <input type="number" name="biaya_service" required min="0" placeholder="Rp Biaya..." class="text-[10px] p-1 rounded border border-green-300 dark:bg-gray-700 w-20 focus:border-green-500">
+                                  <input type="number" name="biaya_service" required min="0" placeholder="Rp Biaya..." class="text-xs p-1 rounded border border-green-300 dark:bg-gray-700 w-24 focus:border-green-500 dark:text-white">
                                   <button type="submit" name="proses_selesai_maintenance" class="px-3 py-1 text-[10px] font-bold text-white bg-green-600 rounded hover:bg-green-700 transition-colors whitespace-nowrap">✔ Finish</button>
                                 </form>
                               </div>
                             </div>
 
-                            <div x-show="isEditing" x-cloak class="min-w-[250px] p-2 bg-blue-50 dark:bg-gray-700 border border-blue-200 dark:border-gray-600 rounded-lg">
+                            <div x-show="isEditing" x-cloak class="p-2 bg-blue-50 dark:bg-gray-700 border border-blue-200 dark:border-gray-600 rounded-lg" style="min-width: 250px;">
                               <form action="maintenance.php" method="POST" class="flex flex-col gap-2 text-xs">
                                 <input type="hidden" name="id_maintenance_edit" value="<?php echo $row['id_maintenance']; ?>">
                                 <div class="flex items-center justify-between gap-2">
                                   <label class="font-semibold text-gray-700 dark:text-gray-300">Ubah Estimasi:</label>
-                                  <input type="date" name="tgl_estimasi_edit" value="<?php echo $row['tgl_estimasi']; ?>" required class="p-1 border rounded focus:border-blue-400 dark:bg-gray-600 dark:border-gray-500">
+                                  <input type="date" name="tgl_estimasi_edit" value="<?php echo $row['tgl_estimasi']; ?>" required class="p-1 border rounded focus:border-blue-400 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
                                 </div>
-                                <input type="text" name="keterangan_edit" value="<?php echo htmlspecialchars($row['keterangan']); ?>" required placeholder="Log montir terbaru..." class="p-1.5 border rounded w-full focus:border-blue-400 dark:bg-gray-600 dark:border-gray-500">
+                                <input type="text" name="keterangan_edit" value="<?php echo htmlspecialchars($row['keterangan']); ?>" required placeholder="Log montir terbaru..." class="p-1.5 border rounded w-full focus:border-blue-400 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
                                 <div class="flex gap-2 justify-end mt-1">
                                   <button type="button" @click.prevent.stop="isEditing = false" class="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Batal</button>
                                   <button type="submit" name="update_proses_maintenance" class="px-3 py-1 text-[10px] font-bold text-white bg-blue-600 rounded hover:bg-blue-700">Simpan Perubahan</button>
@@ -234,7 +262,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors opacity-80">
                           <td class="px-4 py-3">
                             <p class="font-bold text-gray-600 dark:text-gray-400"><?php echo $row['id_maintenance']; ?></p>
-                            <p class="font-mono text-[10px] text-gray-500 mt-1"><?php echo $row['nomor_polisi']; ?></p>
+                            <p class="font-mono text-xs text-gray-500 mt-1"><?php echo $row['nomor_polisi']; ?></p>
                           </td>
                           <td class="px-4 py-3 font-bold text-gray-700 dark:text-gray-300 text-xs">
                             <?php echo htmlspecialchars($row['merk'] . " " . $row['tipe']); ?>
@@ -244,7 +272,7 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
                             <p class="font-bold text-green-600 text-xs"><?php echo date('d M Y', strtotime($row['tgl_service'])); ?></p>
                           </td>
                           <td class="px-4 py-3">
-                            <p class="text-lg font-black text-red-600">Rp <?php echo number_format($row['biaya_service'], 0, ',', '.'); ?></p>
+                            <p class="text-lg font-black text-red-600 dark:text-red-400">Rp <?php echo number_format($row['biaya_service'], 0, ',', '.'); ?></p>
                           </td>
                           <td class="px-4 py-3 text-center">
                             <a href="detail_maintenance.php?id=<?php echo $row['id_maintenance']; ?>" class="inline-flex items-center px-4 py-1.5 text-xs font-bold text-gray-600 bg-gray-200 border border-gray-300 rounded hover:bg-gray-300 transition-colors shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">
@@ -271,23 +299,23 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
   </div>
 
   <div x-show="isAddOpen" x-cloak x-transition
-    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4"
+    style="z-index: 9999; backdrop-filter: blur(4px);">
     
-    <div @click.away="isAddOpen = false" class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 cursor-default" role="dialog">
+    <div @click.away="isAddOpen = false" class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 cursor-default overflow-visible" role="dialog">
       
       <header class="flex justify-between items-center border-b pb-3 mb-5 dark:border-gray-700">
-        <h3 class="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider text-sm">Masukan Unit ke Bengkel (Manual)</h3>
+        <h3 class="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider text-sm">Masukan Unit ke Bengkel</h3>
         <button type="button" @click.stop="isAddOpen = false" class="text-gray-400 hover:text-red-500 font-black text-lg transition-colors">✕</button>
       </header>
 
       <form action="maintenance.php" method="POST" class="space-y-4">
         
         <label class="block text-sm">
-          <span class="text-gray-700 dark:text-gray-400 font-medium">Pilih Unit Armada (Hanya Yang Tersedia)</span>
-          <select name="id_mobil_manual" required class="block w-full mt-1 text-sm dark:bg-gray-700 form-select focus:border-purple-400 rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-200 p-2.5">
-            <option value="">-- Pilih Mobil --</option>
+          <span class="text-gray-700 dark:text-gray-400 font-medium mb-1 block">Pilih Unit Armada (Hanya Yang Tersedia)</span>
+          <select name="id_mobil_manual" required class="searchable-select block w-full text-sm">
+            <option value="">-- Ketik / Pilih Mobil --</option>
             <?php
-            // FIX: Query sesuai ENUM (Huruf T besar)
             $mob_ready = mysqli_query($conn, "SELECT id_mobil, merk, tipe, nomor_polisi FROM mobil WHERE status_mobil = 'Tersedia'");
             while ($m = mysqli_fetch_assoc($mob_ready)) {
               echo "<option value='" . $m['id_mobil'] . "'>" . $m['merk'] . " " . $m['tipe'] . " [" . $m['nomor_polisi'] . "]</option>";
@@ -314,6 +342,20 @@ $sql_filter = ($filter_status === 'selesai') ? "WHERE mn.status_maintenance = 's
       </form>
     </div>
   </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      document.querySelectorAll('.searchable-select').forEach((el) => {
+        new TomSelect(el, {
+          create: false,
+          sortField: {
+            field: "text",
+            direction: "asc"
+          }
+        });
+      });
+    });
+  </script>
 
 </body>
 </html>

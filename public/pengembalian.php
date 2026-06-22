@@ -45,7 +45,6 @@ if (isset($_POST['proses_kembali'])) {
   $r_trans = mysqli_fetch_assoc($q_trans);
   $id_mobil = $r_trans['id_mobil'];
 
-  // LOGIKA BARU: Batas waktu pengembalian dipatok Pukul 14:00 WIB pada hari kepulangan
   $tgl_seharusnya = date('Y-m-d', strtotime($r_trans['tanggal_kembali'])) . ' 14:00:00';
 
   $selisih_detik = strtotime($tanggal_kembali_aktual) - strtotime($tgl_seharusnya);
@@ -189,7 +188,6 @@ if ($total_pages < 1) $total_pages = 1;
 
             $waktu_sekarang = date('Y-m-d H:i:s');
             
-            // LOGIKA BARU: Batas waktu pengembalian dipatok Pukul 14:00 WIB pada hari kepulangan
             $tgl_jatuh_tempo_aktual = date('Y-m-d', strtotime($dt['tanggal_kembali'])) . ' 14:00:00';
 
             $selisih_detik = strtotime($waktu_sekarang) - strtotime($tgl_jatuh_tempo_aktual);

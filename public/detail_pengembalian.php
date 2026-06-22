@@ -9,7 +9,6 @@ if (!isset($_SESSION['username'])) {
   exit;
 }
 
-// Ambil ID Transaksi dari URL
 if (!isset($_GET['id']) || empty($_GET['id'])) {
   header("Location: pengembalian.php");
   exit;
@@ -17,7 +16,6 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $id_transaksi = mysqli_real_escape_string($conn, $_GET['id']);
 
-// Kueri master mengambil transaksi, pelanggan, dan mobil
 $query_utama = "SELECT t.*, p.nama_pelanggan, p.no_telepon, m.merk, m.tipe, m.nomor_polisi
                 FROM transaksi_rental t
                 JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
@@ -33,7 +31,6 @@ if (mysqli_num_rows($result) == 0) {
 
 $data = mysqli_fetch_assoc($result);
 
-// Ambil data denda dari tabel denda_kerusakan secara mandiri
 $q_cek_denda = mysqli_query($conn, "SELECT * FROM denda_kerusakan WHERE id_transaksi = '$id_transaksi'");
 $denda_data  = mysqli_fetch_assoc($q_cek_denda);
 

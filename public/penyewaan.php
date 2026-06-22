@@ -8,7 +8,6 @@ if (!isset($_SESSION['username'])) {
   exit;
 }
 
-// ─── MASTER QUERY: AUTO-SYNC STATUS MOBIL BERDASARKAN KALENDER (REAL-TIME) ───
 $q_sync = "UPDATE mobil m
 SET status_mobil = (
     CASE
@@ -30,7 +29,6 @@ SET status_mobil = (
 )";
 mysqli_query($conn, $q_sync);
 
-// ─── LOGIKA PEMBATALAN BOOKING ───
 if (isset($_GET['batal'])) {
   $id_batal = mysqli_real_escape_string($conn, $_GET['batal']);
   mysqli_query($conn, "UPDATE transaksi_rental SET status_sewa = 'Dibatalkan' WHERE id_transaksi = '$id_batal'");
@@ -39,7 +37,6 @@ if (isset($_GET['batal'])) {
   exit;
 }
 
-// ─── LOGIKA PROSES BACKEND: INPUT TRANSAKSI RENTAL BARU ───
 if (isset($_POST['save_transaksi'])) {
   $id_transaksi    = mysqli_real_escape_string($conn, $_POST['id_transaksi']);
   $id_pelanggan    = mysqli_real_escape_string($conn, $_POST['id_pelanggan']);
@@ -52,7 +49,6 @@ if (isset($_POST['save_transaksi'])) {
   $tanggal_kembali = date('Y-m-d', strtotime($tanggal_sewa . ' + ' . $durasi_sewa . ' days'));
   $tanggal_kembali_plus_5 = date('Y-m-d', strtotime($tanggal_kembali . ' + 5 days'));
 
-  // CEK TABRAKAN JADWAL EKSKLUSIF
   $q_cek = "SELECT id_transaksi FROM transaksi_rental 
             WHERE id_mobil = '$id_mobil' 
             AND status_sewa IN ('Booking', 'Disewakan') 
@@ -93,7 +89,6 @@ if (isset($_POST['save_transaksi'])) {
   }
 }
 
-// ─── LOGIKA BACKEND: PAGINATION LIMIT 10 DATA & SEARCH ───
 $limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -156,13 +151,12 @@ while ($row = mysqli_fetch_assoc($q_rental)) {
   <style>
     [x-cloak] { display: none !important; }
     
-    /* CUSTOM CSS TOMSELECT AGAR MENYATU DENGAN WINDMILL TAILWIND (LIGHT & DARK MODE) */
     .ts-wrapper { padding: 0 !important; border: none !important; }
     .ts-control {
-      border-radius: 0.375rem !important; /* rounded-md */
+      border-radius: 0.375rem !important;
       padding: 0.5rem 0.75rem !important;
-      font-size: 0.875rem !important; /* text-sm */
-      border: 1px solid #d1d5db !important; /* border-gray-300 */
+      font-size: 0.875rem !important;
+      border: 1px solid #d1d5db !important;
       background-color: #fff !important; 
       box-shadow: none !important;
       min-height: 42px !important;
@@ -172,11 +166,10 @@ while ($row = mysqli_fetch_assoc($q_rental)) {
     .ts-control > input { font-size: 0.875rem !important; }
     .ts-dropdown { font-size: 0.875rem !important; border-radius: 0.375rem !important; }
     
-    /* DARK MODE OVERRIDES */
     .theme-dark .ts-control {
-      background-color: #374151 !important; /* dark:bg-gray-700 */
-      border-color: #4b5563 !important; /* dark:border-gray-600 */
-      color: #e5e7eb !important; /* dark:text-gray-200 */
+      background-color: #374151 !important;
+      border-color: #4b5563 !important;
+      color: #e5e7eb !important;
     }
     .theme-dark .ts-control input { color: #e5e7eb !important; }
     .theme-dark .ts-dropdown {
@@ -336,18 +329,18 @@ while ($row = mysqli_fetch_assoc($q_rental)) {
             </div>
 
             <div class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-4">
-              <div class="w-full overflow-x-auto">
-                <table class="w-full whitespace-no-wrap">
+              <div class="w-full overflow-x-auto pb-4">
+                <table class="w-full text-left">
                   <thead>
-                    <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
-                      <th class="px-4 py-3">ID Transaksi</th>
-                      <th class="px-4 py-3">Nama Pelanggan</th>
-                      <th class="px-4 py-3">Armada Mobil</th>
-                      <th class="px-4 py-3">Tgl Sewa</th>
-                      <th class="px-4 py-3">Tgl Kembali Seharusnya</th>
-                      <th class="px-4 py-3">Total Biaya</th>
-                      <th class="px-4 py-3">Status</th>
-                      <th class="px-4 py-3 text-center">Aksi</th>
+                    <tr class="text-xs font-semibold tracking-wide text-gray-500 uppercase border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+                      <th class="px-4 py-3 whitespace-nowrap">ID</th>
+                      <th class="px-4 py-3 whitespace-nowrap">Pelanggan</th>
+                      <th class="px-4 py-3 min-w-[180px]">Unit Mobil</th>
+                      <th class="px-4 py-3 whitespace-nowrap">Tgl Sewa</th>
+                      <th class="px-4 py-3 whitespace-nowrap">Batas Kembali</th>
+                      <th class="px-4 py-3 whitespace-nowrap">Total Biaya</th>
+                      <th class="px-4 py-3 whitespace-nowrap text-center">Status</th>
+                      <th class="px-4 py-3 whitespace-nowrap text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm">
@@ -369,28 +362,35 @@ while ($row = mysqli_fetch_assoc($q_rental)) {
                         }
                         ?>
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                          <td class="px-4 py-3 font-semibold text-purple-600"><?php echo $item['id']; ?></td>
-                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white"><?php echo htmlspecialchars($item['cust_name']); ?></td>
-                          <td class="px-4 py-3"><?php echo htmlspecialchars($item['mobil'] . " [ " . $item['plat'] . " ]"); ?></td>
-                          <td class="px-4 py-3"><?php echo $item['tgl_sewa']; ?></td>
-                          <td class="px-4 py-3 font-medium text-amber-600 dark:text-amber-400"><?php echo $item['tgl_kembali']; ?></td>
-                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white">Rp <?php echo $item['total']; ?></td>
+                          <td class="px-4 py-3 font-semibold text-purple-600 whitespace-nowrap"><?php echo $item['id']; ?></td>
+                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap"><?php echo htmlspecialchars($item['cust_name']); ?></td>
+                          
                           <td class="px-4 py-3">
+                            <p class="font-bold text-gray-800 dark:text-gray-200 text-xs"><?php echo htmlspecialchars($item['mobil']); ?></p>
+                            <p class="font-mono text-[10px] inline-block bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 py-0.5 rounded mt-0.5 border dark:border-gray-600"><?php echo htmlspecialchars($item['plat']); ?></p>
+                          </td>
+                          
+                          <td class="px-4 py-3 whitespace-nowrap"><?php echo $item['tgl_sewa']; ?></td>
+                          <td class="px-4 py-3 font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap"><?php echo $item['tgl_kembali']; ?></td>
+                          <td class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap">Rp <?php echo $item['total']; ?></td>
+                          <td class="px-4 py-3 text-center whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 text-[10px] font-extrabold rounded-md uppercase <?php echo $badge_class; ?>">
                               <?php echo $item['status']; ?>
                             </span>
                           </td>
-                          <td class="px-4 py-3 text-center flex items-center justify-center gap-2">
-                            <?php if ($status_clean === 'booking'): ?>
-                              <a href="penyewaan.php?batal=<?php echo $item['id']; ?>" onclick="return confirm('Yakin ingin membatalkan jadwal booking ini? Mobil akan kembali ke garasi.')" class="px-3 py-1 text-xs font-bold text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
-                                Batal
-                              </a>
-                            <?php endif; ?>
-                            
-                            <button type="button" @click.prevent.stop='targetRental = <?php echo htmlspecialchars(json_encode($arr_rental[$index])); ?>; setTimeout(() => { isDetailOpen = true; }, 150)'
-                              class="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors">
-                              Detail
-                            </button>
+                          <td class="px-4 py-3 whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-2">
+                              <?php if ($status_clean === 'booking'): ?>
+                                <a href="penyewaan.php?batal=<?php echo $item['id']; ?>" onclick="return confirm('Yakin ingin membatalkan jadwal booking ini? Mobil akan kembali ke garasi.')" class="px-3 py-1 text-xs font-bold text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                  Batal
+                                </a>
+                              <?php endif; ?>
+                              
+                              <button type="button" @click.prevent.stop='targetRental = <?php echo htmlspecialchars(json_encode($arr_rental[$index])); ?>; setTimeout(() => { isDetailOpen = true; }, 150)'
+                                class="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors">
+                                Detail
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       <?php endforeach; ?>

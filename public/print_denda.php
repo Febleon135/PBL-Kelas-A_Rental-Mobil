@@ -9,7 +9,6 @@ if (!isset($_SESSION['username'])) {
 
 $id = isset($_GET['id']) ? mysqli_real_escape_string($conn, $_GET['id']) : '';
 
-// SOLUSI AMAN: Kueri hanya mengambil data dari tabel master transaksi, pelanggan, dan mobil
 $query = mysqli_query($conn, "SELECT t.*, p.nama_pelanggan, p.no_telepon, m.merk, m.tipe, m.nomor_polisi
                               FROM transaksi_rental t
                               JOIN pelanggan p ON t.id_pelanggan = p.id_pelanggan
@@ -21,7 +20,6 @@ if (!$data) {
     exit("Data transaksi tidak ditemukan.");
 }
 
-// Ambil data denda secara terpisah menggunakan metode urutan fisik array_values
 $q_cek_denda = mysqli_query($conn, "SELECT * FROM denda_kerusakan WHERE id_transaksi = '$id'");
 $denda_data  = mysqli_fetch_assoc($q_cek_denda);
 
@@ -34,7 +32,6 @@ if ($denda_data) {
     $catatan_lap     = 'Unit dikembalikan tepat waktu tanpa kerusakan.';
 }
 
-// FIX: Hilangkan jam 00:00 dan set jatuh tempo jadi +1 hari (24 Jam) dari tanggal kembali
 $tgl_jatuh_tempo = date('d-m-Y', strtotime($data['tanggal_kembali'] . ' +1 day'));
 ?>
 <!DOCTYPE html>

@@ -4,11 +4,10 @@ include 'config.php';
 
 /** @var mysqli $conn */
 if (!isset($_SESSION['username'])) {
-  header("Location: login.php");
+  header("Location: login.php"); 
   exit;
 }
 
-// ─── LOGIKA BACKEND 1: HAPUS ARMADA MOBIL ───
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && $_SESSION['role'] !== 'staff') {
   $id_hapus = mysqli_real_escape_string($conn, $_GET['id']);
 
@@ -27,7 +26,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && $_SESSION['role'] !
   exit;
 }
 
-// ─── LOGIKA BACKEND 2: TAMBAH MOBIL BARU ───
 if (isset($_POST['save_mobil'])) {
   $id_mobil             = mysqli_real_escape_string($conn, $_POST['id_mobil']);
   $id_kategori          = mysqli_real_escape_string($conn, $_POST['id_kategori']);
@@ -64,7 +62,6 @@ if (isset($_POST['save_mobil'])) {
   }
 }
 
-// ─── LOGIKA BACKEND 3: UPDATE DATA MOBIL ───
 if (isset($_POST['update_mobil'])) {
   $id_mobil             = mysqli_real_escape_string($conn, $_POST['id_mobil']);
   $id_kategori          = mysqli_real_escape_string($conn, $_POST['id_kategori']);
@@ -105,7 +102,6 @@ if (isset($_POST['update_mobil'])) {
   exit;
 }
 
-// ─── LOGIKA SINKRONISASI MULTI-FILTER TRIPLE ───
 $where_clauses = [];
 $search_keyword = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : "";
 $filter_kategori = isset($_GET['filter_kategori']) ? mysqli_real_escape_string($conn, $_GET['filter_kategori']) : "";
@@ -127,7 +123,6 @@ if (!empty($filter_tahun)) {
 
 $string_where = count($where_clauses) > 0 ? "WHERE " . implode(" AND ", $where_clauses) : "";
 
-// ─── LOGIKA ENGINE PAGINATION ───
 $batas_data = 12;
 $halaman_aktif = isset($_GET['page']) ? intval($_GET['page']) : 1;
 if ($halaman_aktif < 1) $halaman_aktif = 1;
@@ -139,7 +134,8 @@ $total_mobil = $r_total['total'] ?? 0;
 $total_halaman = ceil($total_mobil / $batas_data);
 ?>
 <!DOCTYPE html>
-<html :class="{ 'theme-dark': dark }" x-data="Object.assign(data(), { isActionMenuOpen: false, isDetailOpen: false, isEditOpen: false, targetMobil: {} })" lang="en">
+<!-- ALPINE V2 SAFE: Gunakan activeMenuId untuk melacak card mana yang pop-upnya terbuka -->
+<html :class="{ 'theme-dark': dark }" x-data="Object.assign(data(), { activeMenuId: null, isDetailOpen: false, isEditOpen: false, targetMobil: {} })" lang="en">
 
 <head>
   <?php include 'components/head.php'; ?>
@@ -164,6 +160,7 @@ $total_halaman = ceil($total_mobil / $batas_data);
       position: relative !important;
       cursor: pointer;
       transition: all 0.2s ease;
+      overflow: hidden !important; 
     }
 
     .figma-img-box {
@@ -213,9 +210,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
           <?php endif; ?>
 
           <?php
-          // =========================================================================
-          // VIEW A: FORM TAMBAH DATA MOBIL BARU
-          // =========================================================================
           if (isset($_GET['action']) && $_GET['action'] == 'add') {
             $q_id   = mysqli_query($conn, "SELECT id_mobil FROM mobil ORDER BY id_mobil DESC LIMIT 1");
             $row_id = mysqli_fetch_assoc($q_id);
@@ -278,7 +272,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
                     </label>
                   </div>
 
-                  <!-- KOLOM KANAN -->
                   <div>
                     <label class="block text-sm mb-6">
                       <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Masa Berlaku Pajak STNK</span>
@@ -320,9 +313,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
             </div>
 
           <?php
-            // =========================================================================
-            // VIEW B: ETALASE UTAMA + BAR MULTI-FILTER TRIPLE
-            // =========================================================================
           } else {
           ?>
             <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
@@ -416,7 +406,8 @@ $total_halaman = ceil($total_mobil / $batas_data);
                     'gbr' => $c['gambar']
                   ]);
               ?>
-                  <div @click="targetMobil = <?php echo htmlspecialchars($payload_json); ?>; isActionMenuOpen = true"
+                  
+                  <div @click="targetMobil = <?php echo htmlspecialchars($payload_json); ?>; activeMenuId = '<?php echo $c['id_mobil']; ?>'"
                     class="figma-card bg-white border border-gray-100 dark:bg-gray-800 dark:border-gray-700 shadow-sm hover:scale-[1.02] hover:shadow-md transition-all duration-150">
 
                     <div class="figma-img-box bg-gray-50 border border-gray-100 dark:bg-gray-700 dark:border-gray-600">
@@ -440,6 +431,52 @@ $total_halaman = ceil($total_mobil / $batas_data);
                         <span class="w-1.5 h-1.5 mr-1.5 rounded-full" style="background-color: currentColor;"></span><?php echo $c['status_mobil']; ?>
                       </span>
                     </div>
+
+                    <div x-show="activeMenuId === '<?php echo $c['id_mobil']; ?>'" x-cloak 
+                         x-transition:enter="transition ease-out duration-200" 
+                         x-transition:enter-start="opacity-0 scale-95" 
+                         x-transition:enter-end="opacity-100 scale-100" 
+                         x-transition:leave="transition ease-in duration-150" 
+                         x-transition:leave-start="opacity-100 scale-100" 
+                         x-transition:leave-end="opacity-0 scale-95"
+                         @click.away="activeMenuId = null"
+                         @click.stop=""
+                         class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white bg-opacity-95 dark:bg-gray-800 dark:bg-opacity-95 rounded-2xl p-5 shadow-inner cursor-default">
+                         
+                         <div class="mb-4 text-center">
+                           <span class="px-2.5 py-0.5 rounded-md font-mono text-[10px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-100 uppercase tracking-wider"><?php echo htmlspecialchars($c['nomor_polisi']); ?></span>
+                           <h4 class="text-xs font-black text-gray-800 dark:text-gray-100 uppercase tracking-tight mt-2"><?php echo htmlspecialchars($c['merk'] . ' ' . $c['tipe']); ?></h4>
+                         </div>
+
+                         <div class="flex flex-col space-y-2 w-full px-1 text-xs font-bold">
+                           <button @click.prevent.stop="activeMenuId = null; setTimeout(() => { isDetailOpen = true; }, 150)"
+                             class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 transition duration-150 shadow-sm">
+                             Detail Spesifikasi
+                           </button>
+
+                           <?php if ($_SESSION['role'] !== 'staff'): ?>
+                             <button @click.prevent.stop="activeMenuId = null; setTimeout(() => { isEditOpen = true; }, 150)"
+                               class="w-full py-2 text-yellow-700 bg-yellow-100 hover:bg-yellow-200 dark:text-white dark:bg-yellow-600 dark:hover:bg-yellow-500 rounded-lg transition duration-150">
+                               Edit Data Unit
+                             </button>
+
+                             <a href="mobil.php?action=delete&id=<?php echo $c['id_mobil']; ?>"
+                               onclick="return confirm('Apakah Anda yakin ingin menghapus total unit armada ini dari database?')"
+                               class="w-full py-2 text-center block text-red-700 bg-red-100 hover:bg-red-200 dark:text-white dark:bg-red-600 dark:hover:bg-red-500 rounded-lg transition duration-150">
+                               Delete Permanen
+                             </a>
+                           <?php else: ?>
+                             <div class="py-2 bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-300 italic rounded-lg text-[10px] font-medium border border-dashed border-gray-200 dark:border-gray-600 text-center">
+                               Akses Terkunci (Staff)
+                             </div>
+                           <?php endif; ?>
+
+                           <button @click.prevent.stop="activeMenuId = null" class="w-full py-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-[10px] font-semibold pt-2 transition duration-150">
+                             ✕ Batalkan & Tutup
+                           </button>
+                         </div>
+                    </div>
+
                   </div>
               <?php
                 }
@@ -496,51 +533,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
     </div>
   </div>
 
-  <!-- POP-UP MENU AKSI (DIPERBAIKI DENGAN TAILWIND CLASS MURNI) -->
-  <div x-show="isActionMenuOpen" x-cloak x-transition
-    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-
-    <div @click.away="isActionMenuOpen = false"
-      class="bg-white dark:bg-gray-800 rounded-2xl p-6 text-center shadow-2xl border border-gray-100 dark:border-gray-700 w-[280px] cursor-default">
-
-      <div class="mb-5">
-        <span class="px-2.5 py-0.5 rounded-md font-mono text-[10px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 uppercase tracking-wider" x-text="targetMobil.plat"></span>
-        <h4 class="text-sm font-black text-gray-800 dark:text-gray-100 uppercase tracking-tight mt-2" x-text="targetMobil.merk + ' ' + targetMobil.tipe"></h4>
-      </div>
-
-      <div class="flex flex-col space-y-2 text-xs font-bold">
-        <button @click.prevent.stop="isActionMenuOpen = false; setTimeout(() => { isDetailOpen = true; }, 150)"
-          class="w-full py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition duration-150 shadow-sm">
-          Detail Spesifikasi
-        </button>
-
-        <?php if ($_SESSION['role'] !== 'staff'): ?>
-          <button @click.prevent.stop="isActionMenuOpen = false; setTimeout(() => { isEditOpen = true; }, 150)"
-            class="w-full py-2.5 text-amber-700 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-900/60 rounded-xl transition duration-150">
-            Edit Data Unit
-          </button>
-
-          <a :href="'mobil.php?action=delete&id=' + targetMobil.id"
-            onclick="return confirm('Apakah Anda yakin ingin menghapus total unit armada ini dari database?')"
-            class="w-full py-2.5 text-center block text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/60 rounded-xl transition duration-150">
-            Delete Permanen
-          </a>
-        <?php else: ?>
-          <div class="py-2 bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 italic rounded-xl text-[11px] font-medium border border-dashed dark:border-gray-600">
-            Akses Modifikasi Dikunci (Staff)
-          </div>
-        <?php endif; ?>
-
-        <button @click="isActionMenuOpen = false"
-          class="w-full py-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[11px] font-semibold pt-3 transition duration-150">
-          ✕ Batalkan & Tutup
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- POP-UP DETAIL MOBIL (DIPERBAIKI DENGAN TAILWIND CLASS MURNI) -->
   <div x-show="isDetailOpen" x-cloak x-transition
     class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
 
@@ -610,7 +602,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
     </div>
   </div>
 
-  <!-- POP-UP EDIT DATA MOBIL -->
   <div x-show="isEditOpen" x-cloak class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" x-transition>
     <div @click.away="isEditOpen = false" class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-100 dark:border-gray-700 text-sm overflow-y-auto max-h-[90vh]" role="dialog">
       <header class="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
@@ -625,7 +616,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
         <input type="hidden" name="id_mobil" :value="targetMobil.id">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Kolom Kiri -->
           <div>
             <label class="block text-sm mb-6">
               <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Kategori Kelas</span>
@@ -665,7 +655,6 @@ $total_halaman = ceil($total_mobil / $batas_data);
             </label>
           </div>
 
-          <!-- Kolom Kanan -->
           <div>
             <label class="block text-sm mb-6">
               <span class="text-gray-700 dark:text-gray-400 font-semibold mb-2 block">Masa Berlaku Pajak STNK</span>
