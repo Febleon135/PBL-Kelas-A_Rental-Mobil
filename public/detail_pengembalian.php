@@ -3,7 +3,6 @@ session_start();
 include 'config.php';
 
 /** @var mysqli $conn */
-// PROTEKSI: Jika belum login, tendang ke login.php
 if (!isset($_SESSION['username'])) {
   header("Location: login.php");
   exit;
